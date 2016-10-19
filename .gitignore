@@ -25,7 +25,6 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
-tests/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -138,3 +137,4 @@ fabric.properties
 
 src/sonic_ax_impl/mibs/vendor/
 gh-release.patch
+tests/test_cpuUtilizationHandler.py
