@@ -1,7 +1,7 @@
 # This file describes the maintainers for sonic-snmpagent
 # See the SONiC project governance document for more information
 
-Name = "Darren Loher"
-Email = "daloher@microsoft.com"
-Github = dplore
+Name = "Thomas Booth"
+Email = "thomasbo@microsoft.com"
+Github = tombo315
 Mailinglist = sonicproject@googlegroups.com
