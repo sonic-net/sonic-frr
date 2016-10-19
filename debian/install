@@ -1,4 +1,0 @@
-systemd/*  /lib/systemd/system/
-bin/* /usr/sbin/
-dist-packages/* /usr/lib/python2.7/dist-packages/
-
