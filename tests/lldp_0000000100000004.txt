@@ -1,4 +1,0 @@
-LldpRemPortIdSubtype, maaddress
-LldpRemPortID, 528
-LldpRemPortDescr, ge-0/0/11.0
-LldpRemSysName, str-22ex-220-ad18
