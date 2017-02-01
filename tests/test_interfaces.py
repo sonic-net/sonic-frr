@@ -9,15 +9,77 @@ sys.path.insert(0, os.path.join(modules_path, 'src'))
 
 from unittest import TestCase
 
-from ax_interface.pdu import PDU
+from ax_interface import ValueType
+from ax_interface.pdu_implementations import GetPDU, GetNextPDU
+from ax_interface.encodings import ObjectIdentifier
+from ax_interface.constants import PduTypes
+from ax_interface.pdu import PDU, PDUHeader
 from ax_interface.mib import MIBTable
 from sonic_ax_impl.mibs.ietf import rfc1213
-
 
 class TestGetNextPDU(TestCase):
     @classmethod
     def setUpClass(cls):
         cls.lut = MIBTable(rfc1213.InterfacesMIB)
+
+    def test_getnextpdu_noneifindex(self):
+        # oid.include = 1
+        oid = ObjectIdentifier(10, 0, 1, 0, (1, 3, 6, 1, 2, 1, 2, 2, 1, 1))
+        get_pdu = GetNextPDU(
+            header=PDUHeader(1, PduTypes.GET, 16, 0, 42, 0, 0, 0),
+            oids=[oid]
+        )
+
+        encoded = get_pdu.encode()
+        response = get_pdu.make_response(self.lut)
+        print(response)
+
+        n = len(response.values)
+        # self.assertEqual(n, 7)
+        value0 = response.values[0]
+        self.assertEqual(value0.type_, ValueType.INTEGER)
+        print("test_getnextpdu_exactmatch: ", str(oid))
+        self.assertEqual(str(value0.name), str(ObjectIdentifier(11, 0, 1, 0, (1, 3, 6, 1, 2, 1, 2, 2, 1, 1, 1))))
+        self.assertEqual(value0.data, 0)
+
+    def test_getnextpdu_firstifindex(self):
+        # oid.include = 1
+        oid = ObjectIdentifier(9, 0, 1, 0, (1, 3, 6, 1, 2, 1, 2, 2, 1))
+        get_pdu = GetNextPDU(
+            header=PDUHeader(1, PduTypes.GET, 16, 0, 42, 0, 0, 0),
+            oids=[oid]
+        )
+
+        encoded = get_pdu.encode()
+        response = get_pdu.make_response(self.lut)
+        print(response)
+
+        n = len(response.values)
+        # self.assertEqual(n, 7)
+        value0 = response.values[0]
+        self.assertEqual(value0.type_, ValueType.INTEGER)
+        print("test_getnextpdu_exactmatch: ", str(oid))
+        self.assertEqual(str(value0.name), str(ObjectIdentifier(11, 0, 1, 0, (1, 3, 6, 1, 2, 1, 2, 2, 1, 1, 1))))
+        self.assertEqual(value0.data, 0)
+
+    def test_getnextpdu_secondifindex(self):
+        oid = ObjectIdentifier(11, 0, 0, 0, (1, 3, 6, 1, 2, 1, 2, 2, 1, 1, 1))
+        get_pdu = GetNextPDU(
+            header=PDUHeader(1, PduTypes.GET, 16, 0, 42, 0, 0, 0),
+            oids=[oid]
+        )
+
+        encoded = get_pdu.encode()
+        response = get_pdu.make_response(self.lut)
+        print(response)
+
+        n = len(response.values)
+        # self.assertEqual(n, 7)
+        value0 = response.values[0]
+        self.assertEqual(value0.type_, ValueType.INTEGER)
+        print("test_getnextpdu_exactmatch: ", str(oid))
+        self.assertEqual(str(value0.name), str(ObjectIdentifier(11, 0, 1, 0, (1, 3, 6, 1, 2, 1, 2, 2, 1, 1, 5))))
+        self.assertEqual(value0.data, 4)
 
     def test_regisiter_response(self):
         mib_2_response = b'\x01\x12\x10\x00\x00\x00\x001\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00,\x01d`\xab\x00\x00\x00\x00\x00\x05\x00\x00\x07\x04\x00\x00\x00\x00\x00\x01\x00\x00\x17\x8b\x00\x00\x00\x03\x00\x00\x00\n\x00\x00\x00\x01\x00\x00\x00\x02\x00\x00\x00\t\x01\x12\x10\x00\x00\x00\x001\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x18\x01d`\xab\x00\x00\x00\x00\x00\x05\x00\x00\x02\x02\x00\x00\x00\x00\x00\x01\x00\x00\x00\x02'
@@ -66,7 +128,6 @@ class TestGetNextPDU(TestCase):
         KeyError: b'OUT_QLEN'
         counter_value = self.if_counters[sai_id][_table_name]
         snmp-subagent[242]: File "/usr/lib/python3.5/site-packages/ax_interface/mib.py", line 133, in __call__
-
         KeyError triggered when attribute is absent from interface counters.
         TODO: exemplary bad DB
         """

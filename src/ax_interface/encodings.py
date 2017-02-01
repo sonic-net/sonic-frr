@@ -52,6 +52,13 @@ class ObjectIdentifier(
         format_string = endianness + 'BBBB' + str(len(self.subids)) + 'L'
         return struct.pack(format_string, self.n_subid, self.prefix_, self.include, self.reserved, *self.subids)
 
+    def inc(self):
+        """
+        Returns a new object identifier with last subid increased by one
+        """
+        newsubids = self.subids[:-1] + (self.subids[-1] + 1,)
+        return self._replace(subids = newsubids)
+
     @classmethod
     def null_oid(cls):
         return cls(0, 0, 0, 0, ())

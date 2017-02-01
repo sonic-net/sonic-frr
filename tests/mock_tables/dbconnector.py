@@ -28,6 +28,12 @@ class SSWSyncClient(mockredis.MockRedis):
                 for h, table in db.items():
                     for k, v in table.items():
                         self.hset(h, k, v)
+        elif db == 1:
+            with open(INPUT_DIR + '/asic_db.json') as f:
+                db = json.load(f)
+                for h, table in db.items():
+                    for k, v in table.items():
+                        self.hset(h, k, v)
         elif db == 2:
             with open(INPUT_DIR + '/counters_db.json') as f:
                 db = json.load(f)

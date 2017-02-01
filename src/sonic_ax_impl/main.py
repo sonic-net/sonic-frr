@@ -11,7 +11,7 @@ import sys
 import ax_interface
 from sonic_ax_impl.mibs import ieee802_1ab
 from . import logger
-from .mibs.ietf import rfc1213, rfc2863
+from .mibs.ietf import rfc1213, rfc2863, rfc4363
 
 # Background task update frequency ( in seconds )
 DEFAULT_UPDATE_FREQUENCY = 5
@@ -23,6 +23,7 @@ shutdown_task = None
 class SonicMIB(
     rfc1213.InterfacesMIB,
     rfc2863.InterfaceMIBObjects,
+    rfc4363.QBridgeMIBObjects,
     ieee802_1ab.LLDPLocPortTable,
     ieee802_1ab.LLDPRemTable,
 ):

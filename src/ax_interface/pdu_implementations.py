@@ -179,7 +179,7 @@ class GetPDU(ContextOptionalPDU):
         else:
             for oid in oids:
                 self.sr.append(
-                    SearchRange(start=oid, end=ObjectIdentifier.null_oid())
+                    SearchRange(start=oid, end=oid.inc())
                 )
             self.header = self.header._replace(payload_length=len(self.encode()))
 
