@@ -241,7 +241,7 @@ class ValueRepresentation(namedtuple('_ValueRepresentation', ('type_', 'reserved
     def from_typecast(cls, type_, oid_iter_or_obj, data):
         oid = ObjectIdentifier.from_iterable(oid_iter_or_obj) \
             if type(oid_iter_or_obj) is not ObjectIdentifier else oid_iter_or_obj
-        if type_ == constants.ValueType.OCTET_STRING:
+        if type_ in cls.OCTET_STRINGS:
             _data = OctetString.from_string(data)
         elif type_ == constants.ValueType.OBJECT_IDENTIFIER:
             _data = ObjectIdentifier.from_iterable(data) if type(data) is not ObjectIdentifier else data
