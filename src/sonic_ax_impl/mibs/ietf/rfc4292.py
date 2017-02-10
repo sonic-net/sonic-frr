@@ -14,8 +14,8 @@ def ip2tuple(ip):
 class RouteUpdater(MIBUpdater):
     def __init__(self):
         super().__init__()
+        self.tos = 0 # ipCidrRouteTos
         self.db_conn, _, _, _, _, _ = mibs.init_sync_d_interface_tables()
-        # call our update method once to "seed" data before the "Agent" starts accepting requests.
         self.update_data()
 
     def update_data(self):
@@ -37,7 +37,7 @@ class RouteUpdater(MIBUpdater):
                 ent = self.db_conn.get_all(mibs.APPL_DB, routestr, blocking=True)
                 nexthops = ent[b"nexthop"].decode()
                 for nh in nexthops.split(','):
-                    sub_id = ip2tuple(ipn.network_address) + ip2tuple(ipn.netmask) + ip2tuple(nh)
+                    sub_id = ip2tuple(ipn.network_address) + ip2tuple(ipn.netmask) + (self.tos,) + ip2tuple(nh)
                     self.route_dest_list.append(sub_id)
                     self.route_dest_map[sub_id] = ipn.network_address.packed
 
