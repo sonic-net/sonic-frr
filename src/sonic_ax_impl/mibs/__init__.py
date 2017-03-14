@@ -11,6 +11,7 @@ APPL_DB = 'APPL_DB'
 ASIC_DB = 'ASIC_DB'
 COUNTERS_DB = 'COUNTERS_DB'
 
+redis_kwargs = {'unix_socket_path': '/var/run/redis/redis.sock'}
 
 def counter_table(sai_id):
     """
@@ -39,6 +40,10 @@ def get_index(if_name):
         return int(n) + 1
 
 
+def config(**kwargs):
+    global redis_kwargs
+    redis_kwargs = {k:v for (k,v) in kwargs.items() if k in ['unix_socket_path', 'host', 'port']}
+
 def init_sync_d_interface_tables():
     """
     DRY helper method. Connects to and initializes interface maps for SyncD-connected MIB(s).
@@ -46,7 +51,7 @@ def init_sync_d_interface_tables():
     """
     # SyncD database connector. THIS MUST BE INITIALIZED ON A PER-THREAD BASIS.
     # Redis PubSub objects (such as those within sswsdk) are NOT thread-safe.
-    db_conn = SonicV2Connector()
+    db_conn = SonicV2Connector(**redis_kwargs)
     db_conn.connect(COUNTERS_DB)
 
     # { if_name (SONiC) -> sai_id }

@@ -7,6 +7,7 @@ import sswsdk.util
 
 import ax_interface
 import sonic_ax_impl
+from . import mibs
 
 LOG_FORMAT = "snmp-subagent [%(name)s] %(levelname)s: %(message)s"
 
@@ -62,6 +63,9 @@ if __name__ == "__main__":
     # inherit logging handlers in submodules
     ax_interface.logger.handlers = sonic_ax_impl.logger.handlers
     sswsdk.logger.handlers = sonic_ax_impl.logger.handlers
+
+    # init mibs module with command line arguments
+    mibs.config(**args)
 
     if warn_syslog:
         # syslog was unavailable when it should've been.
