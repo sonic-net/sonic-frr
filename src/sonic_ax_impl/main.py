@@ -12,7 +12,7 @@ import ax_interface
 from sonic_ax_impl.mibs import ieee802_1ab
 from . import logger
 from .mibs.ietf import rfc1213, rfc2863, rfc4292, rfc4363
-from .mibs.vendor import dell
+from .mibs.vendor import dell, cisco
 
 # Background task update frequency ( in seconds )
 DEFAULT_UPDATE_FREQUENCY = 5
@@ -30,6 +30,7 @@ class SonicMIB(
     ieee802_1ab.LLDPLocPortTable,
     ieee802_1ab.LLDPRemTable,
     dell.force10.SSeriesMIB,
+    cisco.mgmt.CiscoSystemExtMIB,
 ):
     """
     If SONiC was to create custom MIBEntries, they may be specified here.
