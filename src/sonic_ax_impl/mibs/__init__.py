@@ -95,7 +95,7 @@ def init_sync_d_interface_tables():
     # { SONiC name -> optional rename }
     if_alias_map = _if_alias_map
     logger.debug("Chassis name map:\n" + pprint.pformat(if_alias_map, indent=2))
-    if if_alias_map is None:
+    if if_alias_map is None or len(if_alias_map) == 0:
         logger.warning("No alias map found--port names will use SONiC names.")
         if_alias_map = dict(zip(if_name_map.keys(), if_name_map.keys()))
 
