@@ -34,7 +34,14 @@ def get_index(if_name):
     OIDs are 1-based, interfaces are 0-based, return the 1-based index
     Ethernet N = N + 1
     """
-    match = re.match(SONIC_ETHERNET_RE_PATTERN, if_name.decode())
+    return get_index_from_str(if_name.decode())
+
+def get_index_from_str(if_name):
+    """
+    OIDs are 1-based, interfaces are 0-based, return the 1-based index
+    Ethernet N = N + 1
+    """
+    match = re.match(SONIC_ETHERNET_RE_PATTERN, if_name)
     if match:
         n = match.group(1)
         return int(n) + 1

@@ -48,7 +48,7 @@ class FdbUpdater(MIBUpdater):
             vlanmac = fdb_vlanmac(fdb)
             self.vlanmac_ifindex_map[vlanmac] = mibs.get_index(self.if_id_map[port_oid])
             self.vlanmac_ifindex_list.append(vlanmac)
-            self.vlanmac_ifindex_list.sort()
+        self.vlanmac_ifindex_list.sort()
 
 
     def fdb_ifindex(self, sub_id):

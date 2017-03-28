@@ -3,6 +3,7 @@ from setuptools import setup, find_packages
 dependencies = [
     'sswsdk>=2.0.1',
     'psutil>=4.0',
+    'python_arptable>=0.0.1',
 ]
 
 test_deps = [

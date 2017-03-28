@@ -1,8 +1,11 @@
+import python_arptable
 from enum import unique, Enum
+from bisect import bisect_right
 
 from sonic_ax_impl import mibs
-from ax_interface import MIBMeta, ValueType, MIBUpdater, MIBEntry, ContextualMIBEntry
+from ax_interface import MIBMeta, ValueType, MIBUpdater, MIBEntry, ContextualMIBEntry, SubtreeMIBEntry
 from ax_interface.encodings import ObjectIdentifier
+from ax_interface.util import mac_decimals, ip2tuple_v4
 
 
 @unique
@@ -41,6 +44,51 @@ class DbTables(int, Enum):
     # ifOutQLen ::= { ifEntry 21 }
     SAI_PORT_STAT_IF_OUT_QLEN = 21
 
+class ArpUpdater(MIBUpdater):
+    def __init__(self):
+        super().__init__()
+        self.arp_dest_map = {}
+        self.arp_dest_list = []
+        # call our update method once to "seed" data before the "Agent" starts accepting requests.
+        self.update_data()
+
+    def update_data(self):
+        self.arp_dest_map = {}
+        self.arp_dest_list = []
+        for entry in python_arptable.get_arp_table():
+            dev = entry['Device']
+            mac = entry['HW address']
+            ip = entry['IP address']
+
+            if_index = mibs.get_index_from_str(dev)
+            if if_index is None: continue
+
+            mactuple = mac_decimals(mac)
+            machex = ''.join(chr(b) for b in mactuple)
+            # if MAC is all zero
+            #if not any(mac): continue
+
+            iptuple = ip2tuple_v4(ip)
+
+            subid = (if_index,) + iptuple
+            self.arp_dest_map[subid] = machex
+            self.arp_dest_list.append(subid)
+        self.arp_dest_list.sort()
+
+    def arp_dest(self, sub_id):
+        return self.arp_dest_map.get(sub_id, None)
+
+    def get_next(self, sub_id):
+        right = bisect_right(self.arp_dest_list, sub_id)
+        if right >= len(self.arp_dest_list):
+            return None
+        return self.arp_dest_list[right]
+
+class IpMib(metaclass=MIBMeta, prefix='.1.3.6.1.2.1.4'):
+    arp_updater = ArpUpdater()
+
+    ipNetToMediaPhysAddress = \
+        SubtreeMIBEntry('22.1.2', arp_updater, ValueType.OCTET_STRING, arp_updater.arp_dest)
 
 class InterfacesUpdater(MIBUpdater):
     def __init__(self):

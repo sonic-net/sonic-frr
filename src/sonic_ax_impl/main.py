@@ -23,6 +23,7 @@ shutdown_task = None
 
 class SonicMIB(
     rfc1213.InterfacesMIB,
+    rfc1213.IpMib,
     rfc2863.InterfaceMIBObjects,
     rfc4363.QBridgeMIBObjects,
     rfc4292.IpCidrRouteTable,
