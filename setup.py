@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 dependencies = [
-    'sswsdk>=2.0.1',
+    'swsssdk>=2.0.1',
     'psutil>=4.0',
     'python_arptable>=0.0.1',
 ]
@@ -11,7 +11,7 @@ test_deps = [
 ]
 
 high_performance_deps = [
-    'sswsdk[high_perf]>=2.0.1',
+    'swsssdk[high_perf]>=2.0.1',
 ]
 
 setup(

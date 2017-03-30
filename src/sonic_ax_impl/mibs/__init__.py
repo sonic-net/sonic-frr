@@ -1,7 +1,7 @@
 import pprint
 import re
 
-from sswsdk import SonicV2Connector
+from swsssdk import SonicV2Connector
 
 from sonic_ax_impl import logger, _if_alias_map
 
@@ -57,7 +57,7 @@ def init_sync_d_interface_tables():
     :return: tuple(db_conn, if_name_map, if_id_map, oid_map, if_alias_map)
     """
     # SyncD database connector. THIS MUST BE INITIALIZED ON A PER-THREAD BASIS.
-    # Redis PubSub objects (such as those within sswsdk) are NOT thread-safe.
+    # Redis PubSub objects (such as those within swsssdk) are NOT thread-safe.
     db_conn = SonicV2Connector(**redis_kwargs)
     db_conn.connect(COUNTERS_DB)
 

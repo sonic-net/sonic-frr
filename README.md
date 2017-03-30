@@ -1,6 +1,6 @@
 ## SNMP Subagent
 
-[AgentX](https://www.ietf.org/rfc/rfc2741.txt) implementation for SONiC/SSW. See the [SONiC website](http://azure.github.io/SONiC/) for more information on the SONiC project.
+[AgentX](https://www.ietf.org/rfc/rfc2741.txt) implementation for SONiC Switch State Service. See the [SONiC website](http://azure.github.io/SONiC/) for more information on the SONiC project.
 
 MIB implementations included:
 
