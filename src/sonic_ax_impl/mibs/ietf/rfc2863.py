@@ -1,7 +1,8 @@
 from enum import Enum, unique
+from bisect import bisect_right
 
 from sonic_ax_impl import mibs
-from ax_interface import MIBMeta, MIBUpdater, ValueType, ContextualMIBEntry
+from ax_interface import MIBMeta, MIBUpdater, ValueType, SubtreeMIBEntry
 
 
 @unique
@@ -54,7 +55,12 @@ class InterfaceMIBUpdater(MIBUpdater):
         self.oid_sai_map, \
         self.oid_name_map = mibs.init_sync_d_interface_tables()
 
+        self.lag_name_if_name_map = {}
+        self.if_name_lag_name_map = {}
+        self.oid_lag_name_map = {}
+
         self.if_counters = {}
+        self.if_range = []
         self.update_data()
 
     def update_data(self):
@@ -66,12 +72,46 @@ class InterfaceMIBUpdater(MIBUpdater):
             sai_id: self.db_conn.get_all(mibs.COUNTERS_DB, mibs.counter_table(sai_id), blocking=True)
             for sai_id in self.if_id_map}
 
+        self.lag_name_if_name_map, \
+        self.if_name_lag_name_map, \
+        self.oid_lag_name_map = mibs.init_sync_d_lag_tables(self.db_conn)
+
+        self.if_range = sorted(list(self.oid_sai_map.keys()) + list(self.oid_lag_name_map.keys()))
+        self.if_range = [(i,) for i in self.if_range]
+
+    def get_next(self, sub_id):
+        """
+        :param sub_id: The 1-based sub-identifier query.
+        :return: the next sub id.
+        """
+        right = bisect_right(self.if_range, sub_id)
+        if right == len(self.if_range):
+            return None
+        return self.if_range[right]
+
+    def get_oid(self, sub_id):
+        """
+        :param sub_id: The 1-based sub-identifier query.
+        :return: the interface OID.
+        """
+        if sub_id not in self.if_range:
+            return
+
+        return sub_id[0]
+
     def interface_name(self, sub_id):
         """
         :param sub_id: The 1-based sub-identifier query.
         :return: the interface description (simply the chassis name) for the respective sub_id.
         """
-        return self.if_alias_map[self.oid_name_map[sub_id]]
+        oid = self.get_oid(sub_id)
+        if not oid:
+            return
+
+        if oid in self.oid_lag_name_map:
+            return self.oid_lag_name_map[oid]
+
+        return self.if_alias_map[self.oid_name_map[oid]]
 
     def interface_alias(self, sub_id):
         """
@@ -79,22 +119,44 @@ class InterfaceMIBUpdater(MIBUpdater):
         :param sub_id: The 1-based sub-identifier query.
         :return: The  SONiC name.
         """
-        return self.oid_name_map[sub_id]
+        oid = self.get_oid(sub_id)
+        if not oid:
+            return
+
+        if oid in self.oid_lag_name_map:
+            return self.oid_lag_name_map[oid]
+
+        return self.oid_name_map[oid]
 
     def get_counter32(self, sub_id, table_name):
-        return self._get_counter(sub_id, table_name, 0x00000000ffffffff)
+        oid = self.get_oid(sub_id)
+        if not oid:
+            return
+
+        return self._get_counter(oid, table_name, 0x00000000ffffffff)
 
     def get_counter64(self, sub_id, table_name):
-        return self._get_counter(sub_id, table_name, 0xffffffffffffffff)
+        oid = self.get_oid(sub_id)
+        if not oid:
+            return
 
-    def _get_counter(self, sub_id, table_name, mask):
+        return self._get_counter(oid, table_name, 0xffffffffffffffff)
+
+    def _get_counter(self, oid, table_name, mask):
         """
-        :param sub_id: The 1-based sub-identifier query.
+        :param oid: The 1-based sub-identifier query.
         :param table_name: the redis table (either IntEnum or string literal) to query.
         :param mask: mask to apply to counter
         :return: the counter for the respective sub_id/table.
         """
-        sai_id = self.oid_sai_map[sub_id]
+        if oid in self.oid_lag_name_map:
+            counter_value = 0
+            for lag_member in self.lag_name_if_name_map[self.oid_lag_name_map[oid]]:
+                counter_value += self._get_counter(mibs.get_index(lag_member), table_name, mask)
+
+            return counter_value & mask
+
+        sai_id = self.oid_sai_map[oid]
         # Enum.name or table_name = 'name_of_the_table'
         _table_name = bytes(getattr(table_name, 'name', table_name), 'utf-8')
         try:
@@ -113,64 +175,59 @@ class InterfaceMIBObjects(metaclass=MIBMeta, prefix='.1.3.6.1.2.1.31.1'):
     'ifMIBObjects' https://tools.ietf.org/html/rfc2863#section-6
     """
     if_updater = InterfaceMIBUpdater()
-    _ifNumber = len(if_updater.if_name_map)
-
-    # OID sub-identifiers are 1-based, while the actual interfaces are zero-based.
-    # offset the interface range when registering the OIDs
-    if_range = if_updater.oid_sai_map.keys()
 
     # ifXTable = '1'
     # ifXEntry = '1.1'
 
     ifName = \
-        ContextualMIBEntry('1.1.1', if_range, ValueType.OCTET_STRING, if_updater.interface_name)
+        SubtreeMIBEntry('1.1.1', if_updater, ValueType.OCTET_STRING, if_updater.interface_name)
 
     ifInMulticastPkts = \
-        ContextualMIBEntry('1.1.2', if_range, ValueType.COUNTER_32, if_updater.get_counter32,
+        SubtreeMIBEntry('1.1.2', if_updater, ValueType.COUNTER_32, if_updater.get_counter32,
                            DbTables32(2))
 
     ifInBroadcastPkts = \
-        ContextualMIBEntry('1.1.3', if_range, ValueType.COUNTER_32, if_updater.get_counter32,
+        SubtreeMIBEntry('1.1.3', if_updater, ValueType.COUNTER_32, if_updater.get_counter32,
                            DbTables32(3))
 
     ifOutMulticastPkts = \
-        ContextualMIBEntry('1.1.4', if_range, ValueType.COUNTER_32, if_updater.get_counter32,
+        SubtreeMIBEntry('1.1.4', if_updater, ValueType.COUNTER_32, if_updater.get_counter32,
                            DbTables32(4))
 
     ifOutBroadcastPkts = \
-        ContextualMIBEntry('1.1.5', if_range, ValueType.COUNTER_32, if_updater.get_counter32,
+        SubtreeMIBEntry('1.1.5', if_updater, ValueType.COUNTER_32, if_updater.get_counter32,
                            DbTables32(5))
 
     ifHCInOctets = \
-        ContextualMIBEntry('1.1.6', if_range, ValueType.COUNTER_64, if_updater.get_counter64,
+        SubtreeMIBEntry('1.1.6', if_updater, ValueType.COUNTER_64, if_updater.get_counter64,
                            DbTables64(6))
 
     ifHCInUcastPkts = \
-        ContextualMIBEntry('1.1.7', if_range, ValueType.COUNTER_64, if_updater.get_counter64,
+        SubtreeMIBEntry('1.1.7', if_updater, ValueType.COUNTER_64, if_updater.get_counter64,
                            DbTables64(7))
 
     ifHCInMulticastPkts = \
-        ContextualMIBEntry('1.1.8', if_range, ValueType.COUNTER_64, if_updater.get_counter64,
+        SubtreeMIBEntry('1.1.8', if_updater, ValueType.COUNTER_64, if_updater.get_counter64,
                            DbTables64(8))
 
     ifHCInBroadcastPkts = \
-        ContextualMIBEntry('1.1.9', if_range, ValueType.COUNTER_64, if_updater.get_counter64,
+        SubtreeMIBEntry('1.1.9', if_updater, ValueType.COUNTER_64, if_updater.get_counter64,
                            DbTables64(9))
 
     ifHCOutOctets = \
-        ContextualMIBEntry('1.1.10', if_range, ValueType.COUNTER_64, if_updater.get_counter64,
+        SubtreeMIBEntry('1.1.10', if_updater, ValueType.COUNTER_64, if_updater.get_counter64,
                            DbTables64(10))
 
     ifHCOutUcastPkts = \
-        ContextualMIBEntry('1.1.11', if_range, ValueType.COUNTER_64, if_updater.get_counter64,
+        SubtreeMIBEntry('1.1.11', if_updater, ValueType.COUNTER_64, if_updater.get_counter64,
                            DbTables64(11))
 
     ifHCOutMulticastPkts = \
-        ContextualMIBEntry('1.1.12', if_range, ValueType.COUNTER_64, if_updater.get_counter64,
+        SubtreeMIBEntry('1.1.12', if_updater, ValueType.COUNTER_64, if_updater.get_counter64,
                            DbTables64(12))
 
     ifHCOutBroadcastPkts = \
-        ContextualMIBEntry('1.1.13', if_range, ValueType.COUNTER_64, if_updater.get_counter64,
+        SubtreeMIBEntry('1.1.13', if_updater, ValueType.COUNTER_64, if_updater.get_counter64,
                            DbTables64(13))
 
     """
@@ -187,10 +244,10 @@ class InterfaceMIBObjects(metaclass=MIBMeta, prefix='.1.3.6.1.2.1.31.1'):
                 interface (as defined in the ifStackTable), and disabled(2)
                 otherwise."
     """  # FIXME: Placeholder (original impl reported 0)
-    ifLinkUpDownTrapEnable = ContextualMIBEntry('1.1.14', if_range, ValueType.INTEGER, lambda sub_id: 2)
+    ifLinkUpDownTrapEnable = SubtreeMIBEntry('1.1.14', if_updater, ValueType.INTEGER, lambda sub_id: 2)
 
     # FIXME: Placeholder
-    ifHighSpeed = ContextualMIBEntry('1.1.15', if_range, ValueType.GAUGE_32, lambda sub_id: 40000)
+    ifHighSpeed = SubtreeMIBEntry('1.1.15', if_updater, ValueType.GAUGE_32, lambda sub_id: 40000)
 
     """
     ifPromiscuousMode  OBJECT-TYPE
@@ -209,7 +266,7 @@ class InterfaceMIBObjects(metaclass=MIBMeta, prefix='.1.3.6.1.2.1.31.1'):
                 The value of ifPromiscuousMode does not affect the reception
                 of broadcast and multicast packets/frames by the interface."
     """  # FIXME: Placeholder
-    ifPromiscuousMode = ContextualMIBEntry('1.1.16', if_range, ValueType.INTEGER, lambda sub_id: 1)
+    ifPromiscuousMode = SubtreeMIBEntry('1.1.16', if_updater, ValueType.INTEGER, lambda sub_id: 1)
 
     """
     ifConnectorPresent   OBJECT-TYPE
@@ -221,9 +278,9 @@ class InterfaceMIBObjects(metaclass=MIBMeta, prefix='.1.3.6.1.2.1.31.1'):
                 sublayer has a physical connector and the value 'false(2)'
                 otherwise."
     """  # FIXME: Placeholder
-    ifConnectorPresent = ContextualMIBEntry('1.1.17', if_range, ValueType.INTEGER, lambda sub_id: 1)
+    ifConnectorPresent = SubtreeMIBEntry('1.1.17', if_updater, ValueType.INTEGER, lambda sub_id: 1)
 
-    ifAlias = ContextualMIBEntry('1.1.18', if_range, ValueType.OCTET_STRING, if_updater.interface_alias)
+    ifAlias = SubtreeMIBEntry('1.1.18', if_updater, ValueType.OCTET_STRING, if_updater.interface_alias)
 
     """
     ifCounterDiscontinuityTime OBJECT-TYPE
@@ -240,4 +297,4 @@ class InterfaceMIBObjects(metaclass=MIBMeta, prefix='.1.3.6.1.2.1.31.1'):
             initialization of the local management subsystem, then this
             object contains a zero value."
     """  # FIXME: Placeholder
-    ifCounterDiscontinuityTime = ContextualMIBEntry('1.1.19', if_range, ValueType.TIME_TICKS, lambda sub_id: 0)
+    ifCounterDiscontinuityTime = SubtreeMIBEntry('1.1.19', if_updater, ValueType.TIME_TICKS, lambda sub_id: 0)

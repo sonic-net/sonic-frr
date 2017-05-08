@@ -6,7 +6,10 @@ from swsssdk import SonicV2Connector
 from sonic_ax_impl import logger, _if_alias_map
 
 COUNTERS_PORT_NAME_MAP = b'COUNTERS_PORT_NAME_MAP'
+LAG_TABLE = b'LAG_TABLE'
+LAG_MEMBER_TABLE = b'LAG_MEMBER_TABLE'
 SONIC_ETHERNET_RE_PATTERN = "^Ethernet(\d+)$"
+SONIC_PORTCHANNEL_RE_PATTERN = "^PortChannel(\d+)$"
 APPL_DB = 'APPL_DB'
 ASIC_DB = 'ASIC_DB'
 COUNTERS_DB = 'COUNTERS_DB'
@@ -29,22 +32,46 @@ def lldp_entry_table(if_name):
     return b'LLDP_ENTRY_TABLE:' + if_name
 
 
+def if_entry_table(if_name):
+    """
+    :param if_name: given interface to cast.
+    :return: PORT_TABLE key.
+    """
+    return b'PORT_TABLE:' + if_name
+
+
+def lag_entry_table(lag_name):
+    """
+    :param lag_name: given lag to cast.
+    :return: LAG_TABLE key.
+    """
+    return b'LAG_TABLE:' + lag_name
+
+
 def get_index(if_name):
     """
     OIDs are 1-based, interfaces are 0-based, return the 1-based index
     Ethernet N = N + 1
+    PortChannel N = N + 1000
     """
     return get_index_from_str(if_name.decode())
+
 
 def get_index_from_str(if_name):
     """
     OIDs are 1-based, interfaces are 0-based, return the 1-based index
     Ethernet N = N + 1
+    PortChannel N = N + 1000
     """
-    match = re.match(SONIC_ETHERNET_RE_PATTERN, if_name)
-    if match:
-        n = match.group(1)
-        return int(n) + 1
+    patterns = {
+        SONIC_ETHERNET_RE_PATTERN: 1,
+        SONIC_PORTCHANNEL_RE_PATTERN: 1000
+    }
+
+    for pattern, baseidx in patterns.items():
+        match = re.match(pattern, if_name)
+        if match:
+            return int(match.group(1)) + baseidx
 
 
 def config(**kwargs):
@@ -107,3 +134,44 @@ def init_sync_d_interface_tables():
         if_alias_map = dict(zip(if_name_map.keys(), if_name_map.keys()))
 
     return db_conn, if_name_map, if_alias_map, if_id_map, oid_sai_map, oid_name_map
+
+
+def init_sync_d_lag_tables(db_conn):
+    """
+    Helper method. Connects to and initializes LAG interface maps for SyncD-connected MIB(s).
+    :param db_conn: database connector
+    :return: tuple(lag_name_if_name_map, if_name_lag_name_map, oid_lag_name_map)
+    """
+    # { lag_name (SONiC) -> [ lag_members (if_name) ] }
+    # ex: { "PortChannel0" : [ "Ethernet0", "Ethernet4" ] }
+    lag_name_if_name_map = {}
+    # { if_name (SONiC) -> lag_name }
+    # ex: { "Ethernet0" : "PortChannel0" }
+    if_name_lag_name_map = {}
+    # { OID -> lag_name (SONiC) }
+    oid_lag_name_map = {}
+
+    db_conn.connect(APPL_DB)
+
+    lag_entries = db_conn.keys(APPL_DB, b"LAG_TABLE:*")
+
+    if not lag_entries:
+        return lag_name_if_name_map, if_name_lag_name_map, oid_lag_name_map
+
+    for lag_entry in lag_entries:
+        lag_name = lag_entry[len(b"LAG_TABLE:"):]
+        lag_members = db_conn.keys(APPL_DB, b"LAG_MEMBER_TABLE:%s:*" % lag_name)
+
+        def member_name_str(val, lag_name):
+            return val[len(b"LAG_MEMBER_TABLE:%s:" % lag_name):]
+
+        lag_name_if_name_map[lag_name] = [member_name_str(m, lag_name) for m in lag_members]
+        for key, val in lag_name_if_name_map.items():
+            if_name_lag_name_map[key] = val
+
+    for if_name in lag_name_if_name_map.keys():
+        idx = get_index(if_name)
+        if idx:
+            oid_lag_name_map[idx] = if_name
+
+    return lag_name_if_name_map, if_name_lag_name_map, oid_lag_name_map
