@@ -48,12 +48,8 @@ class InterfaceMIBUpdater(MIBUpdater):
     def __init__(self):
         super().__init__()
 
-        self.db_conn, \
-        self.if_name_map, \
-        self.if_alias_map, \
-        self.if_id_map, \
-        self.oid_sai_map, \
-        self.oid_name_map = mibs.init_sync_d_interface_tables()
+        self.db_conn = mibs.init_db()
+        self.reinit_data()
 
         self.lag_name_if_name_map = {}
         self.if_name_lag_name_map = {}
@@ -62,6 +58,16 @@ class InterfaceMIBUpdater(MIBUpdater):
         self.if_counters = {}
         self.if_range = []
         self.update_data()
+
+    def reinit_data(self):
+        """
+        Subclass update interface information
+        """
+        self.if_name_map, \
+        self.if_alias_map, \
+        self.if_id_map, \
+        self.oid_sai_map, \
+        self.oid_name_map = mibs.init_sync_d_interface_tables(self.db_conn)
 
     def update_data(self):
         """

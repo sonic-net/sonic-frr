@@ -12,14 +12,20 @@ def fdb_vlanmac(fdb):
 class FdbUpdater(MIBUpdater):
     def __init__(self):
         super().__init__()
-        self.db_conn, \
+        self.db_conn = mibs.init_db()
+        self.reinit_data()
+        # call our update method once to "seed" data before the "Agent" starts accepting requests.
+        self.update_data()
+
+    def reinit_data(self):
+        """
+        Subclass update interface information
+        """
         self.if_name_map, \
         self.if_alias_map, \
         self.if_id_map, \
         self.oid_sai_map, \
-        self.oid_name_map = mibs.init_sync_d_interface_tables()
-        # call our update method once to "seed" data before the "Agent" starts accepting requests.
-        self.update_data()
+        self.oid_name_map = mibs.init_sync_d_interface_tables(self.db_conn)
 
     def update_data(self):
         """
@@ -49,7 +55,6 @@ class FdbUpdater(MIBUpdater):
             self.vlanmac_ifindex_map[vlanmac] = mibs.get_index(self.if_id_map[port_oid])
             self.vlanmac_ifindex_list.append(vlanmac)
         self.vlanmac_ifindex_list.sort()
-
 
     def fdb_ifindex(self, sub_id):
         return self.vlanmac_ifindex_map.get(sub_id, None)

@@ -78,14 +78,25 @@ def config(**kwargs):
     global redis_kwargs
     redis_kwargs = {k:v for (k,v) in kwargs.items() if k in ['unix_socket_path', 'host', 'port']}
 
-def init_sync_d_interface_tables():
+def init_db():
     """
-    DRY helper method. Connects to and initializes interface maps for SyncD-connected MIB(s).
-    :return: tuple(db_conn, if_name_map, if_id_map, oid_map, if_alias_map)
+    Connects to DB
+    :return: db_conn
     """
     # SyncD database connector. THIS MUST BE INITIALIZED ON A PER-THREAD BASIS.
     # Redis PubSub objects (such as those within swsssdk) are NOT thread-safe.
     db_conn = SonicV2Connector(**redis_kwargs)
+
+    return db_conn
+
+
+def init_sync_d_interface_tables(db_conn):
+    """
+    Initializes interface maps for SyncD-connected MIB(s).
+    :return: tuple(if_name_map, if_id_map, oid_map, if_alias_map)
+    """
+
+    # Make sure we're connected to COUNTERS_DB
     db_conn.connect(COUNTERS_DB)
 
     # { if_name (SONiC) -> sai_id }
@@ -133,7 +144,7 @@ def init_sync_d_interface_tables():
         logger.warning("No alias map found--port names will use SONiC names.")
         if_alias_map = dict(zip(if_name_map.keys(), if_name_map.keys()))
 
-    return db_conn, if_name_map, if_alias_map, if_id_map, oid_sai_map, oid_name_map
+    return if_name_map, if_alias_map, if_id_map, oid_sai_map, oid_name_map
 
 
 def init_sync_d_lag_tables(db_conn):

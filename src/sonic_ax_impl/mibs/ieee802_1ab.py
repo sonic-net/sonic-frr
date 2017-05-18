@@ -30,27 +30,33 @@ class LLDPUpdater(MIBUpdater):
     def __init__(self):
         super().__init__()
 
-        self.db_conn, \
-        self.if_name_map, \
-        self.if_alias_map, \
-        self.if_id_map, \
-        self.oid_sai_map, \
-        self.oid_name_map = mibs.init_sync_d_interface_tables()
-
-        # establish connection to application database.
-        self.db_conn.connect(mibs.APPL_DB)
+        self.db_conn = mibs.init_db()
+        self.reinit_data()
 
         # cache of interface counters
         # { sai_id -> { 'counter': 'value' } }
         self.lldp_counters = {}
-        self.sai_ids = []
         # call our update method once to "seed" data before the "Agent" starts accepting requests.
         self.update_data()
 
+    def reinit_data(self):
+        """
+        Subclass update interface information
+        """
+        self.if_name_map, \
+        self.if_alias_map, \
+        self.if_id_map, \
+        self.oid_sai_map, \
+        self.oid_name_map = mibs.init_sync_d_interface_tables(self.db_conn)
+
     def update_data(self):
         """
-        Subclass update data routine. Updates available sai_ids and LLDP counters.
+        Subclass update data routine. Updates available LLDP counters.
         """
+
+        # establish connection to application database.
+        self.db_conn.connect(mibs.APPL_DB)
+
         self.lldp_counters = {}
         for if_name in self.if_name_map:
             lldp_kvs = self.db_conn.get_all(mibs.APPL_DB, mibs.lldp_entry_table(if_name))

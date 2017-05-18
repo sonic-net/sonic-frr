@@ -11,6 +11,10 @@ Update interval between update runs (in seconds).
 """
 DEFAULT_UPDATE_FREQUENCY = 5
 
+"""
+Interval between reinit runs (in seconds).
+"""
+DEFAULT_REINIT_RATE = 60
 
 class MIBUpdater:
     """
@@ -20,15 +24,29 @@ class MIBUpdater:
     def __init__(self):
         self.run_event = asyncio.Event()
         self.frequency = DEFAULT_UPDATE_FREQUENCY
+        self.update_counter = 0
+        self.reinit_rate = DEFAULT_REINIT_RATE // DEFAULT_UPDATE_FREQUENCY
 
     async def start(self):
         # Run the update while we are allowed
         while self.run_event.is_set():
+            # reinit internal structures
+            if self.update_counter > self.reinit_rate:
+                self.reinit_data()
+                self.update_counter = 0
+            else:
+                self.update_counter += 1
             # run the background update task
             self.update_data()
             # wait based on our update frequency before executing again.
             # randomize to avoid concurrent update storms.
             await asyncio.sleep(self.frequency + random.randint(-2, 2))
+
+    def reinit_data(self):
+        """
+        Reinit task. Children may override this method.
+        """
+        return
 
     def update_data(self):
         """
