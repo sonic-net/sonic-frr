@@ -1,3 +1,4 @@
+import ipaddress
 import python_arptable
 from enum import unique, Enum
 from bisect import bisect_right
@@ -84,8 +85,57 @@ class ArpUpdater(MIBUpdater):
             return None
         return self.arp_dest_list[right]
 
+class NextHopUpdater(MIBUpdater):
+    def __init__(self):
+        super().__init__()
+        self.db_conn = mibs.init_db()
+        self.update_data()
+
+    def update_data(self):
+        """
+        Update redis (caches config)
+        Pulls the table references for each interface.
+        """
+        self.nexthop_map = {}
+        self.route_list = []
+
+        self.db_conn.connect(mibs.APPL_DB)
+        route_entries = self.db_conn.keys(mibs.APPL_DB, "ROUTE_TABLE:*")
+        if not route_entries:
+            return
+
+        for route_entry in route_entries:
+            routestr = route_entry.decode()
+            ipnstr = routestr[len("ROUTE_TABLE:"):]
+            if ipnstr == "0.0.0.0/0":
+                ipn = ipaddress.ip_network(ipnstr)
+                ent = self.db_conn.get_all(mibs.APPL_DB, routestr, blocking=True)
+                nexthops = ent[b"nexthop"].decode()
+                for nh in nexthops.split(','):
+                    # TODO: if ipn contains IP range, create more sub_id here
+                    sub_id = ip2tuple_v4(ipn.network_address)
+                    self.route_list.append(sub_id)
+                    self.nexthop_map[sub_id] = ipaddress.ip_address(nh).packed
+                    break # Just need the first nexthop
+
+        self.route_list.sort()
+
+    def nexthop(self, sub_id):
+        return self.nexthop_map.get(sub_id, None)
+
+    def get_next(self, sub_id):
+        right = bisect_right(self.route_list, sub_id)
+        if right >= len(self.route_list):
+            return None
+
+        return self.route_list[right]
+
 class IpMib(metaclass=MIBMeta, prefix='.1.3.6.1.2.1.4'):
     arp_updater = ArpUpdater()
+    nexthop_updater = NextHopUpdater()
+
+    ipRouteNextHop = \
+        SubtreeMIBEntry('21.1.7', nexthop_updater, ValueType.IP_ADDRESS, nexthop_updater.nexthop)
 
     ipNetToMediaPhysAddress = \
         SubtreeMIBEntry('22.1.2', arp_updater, ValueType.OCTET_STRING, arp_updater.arp_dest)
