@@ -23,6 +23,10 @@ class TestForwardMIB(TestCase):
     def setUpClass(cls):
         cls.lut = MIBTable(SonicMIB)
 
+    def test_update(self):
+        for updater in TestForwardMIB.lut.updater_instances:
+            updater.update_data()
+
     def test_network_order(self):
         ip = ipaddress.ip_address("0.1.2.3")
         ipb = ip.packed

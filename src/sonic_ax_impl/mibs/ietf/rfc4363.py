@@ -33,11 +33,13 @@ class FdbUpdater(MIBUpdater):
         Pulls the table references for each interface.
         """
         self.db_conn.connect(mibs.ASIC_DB)
-        fdb_strings = self.db_conn.keys(mibs.ASIC_DB, "ASIC_STATE:SAI_OBJECT_TYPE_FDB_ENTRY:*")
         self.vlanmac_ifindex_map = {}
         self.vlanmac_ifindex_list = []
-        if fdb_strings is None:
+
+        fdb_strings = self.db_conn.keys(mibs.ASIC_DB, "ASIC_STATE:SAI_OBJECT_TYPE_FDB_ENTRY:*")
+        if not fdb_strings:
             return
+
         for s in fdb_strings:
             fdb_str = s.decode()
             try:
