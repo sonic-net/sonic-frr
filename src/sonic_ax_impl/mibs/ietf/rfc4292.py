@@ -35,7 +35,12 @@ class RouteUpdater(MIBUpdater):
                 ipn = ipaddress.ip_network(ipnstr)
                 ent = self.db_conn.get_all(mibs.APPL_DB, routestr, blocking=True)
                 nexthops = ent[b"nexthop"].decode()
-                for nh in nexthops.split(','):
+                ifnames = ent[b"ifname"].decode()
+                for nh, ifn in zip(nexthops.split(','), ifnames.split(',')):
+                    ## Ignore non front panel interfaces
+                    ## TODO: non front panel interfaces should not be in APPL_DB at very beginning
+                    ## This is to workaround the bug in current sonic-swss implementation
+                    if ifn == "eth0" or ifn == "lo" or ifn == "docker0": continue
                     sub_id = ip2tuple_v4(ipn.network_address) + ip2tuple_v4(ipn.netmask) + (self.tos,) + ip2tuple_v4(nh)
                     self.route_dest_list.append(sub_id)
                     self.route_dest_map[sub_id] = ipn.network_address.packed
