@@ -53,6 +53,13 @@ class FdbUpdater(MIBUpdater):
             if port_oid.startswith(b"oid:0x"):
                 port_oid = port_oid[6:]
 
+            ## Note: broadcom SAI 0.94 behavior
+            ## Some FDB_ENTRY's port_oid starts with 0x2 is LAG. The whole FDB_ENTRY is not expected, 
+            ## and should be ignored here
+            ## TODO: revisit logic here for LAG in VLAN
+            if port_oid not in self.if_id_map:
+                mibs.logger.info("SyncD 'ASIC_DB' includes a FDB_ENTRY '{}' with an invalid interface id '{}'.".format(fdb_str, port_oid))
+                continue
             vlanmac = fdb_vlanmac(fdb)
             self.vlanmac_ifindex_map[vlanmac] = mibs.get_index(self.if_id_map[port_oid])
             self.vlanmac_ifindex_list.append(vlanmac)
