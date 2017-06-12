@@ -214,7 +214,7 @@ class SubtreeMIBEntry(MIBEntry):
             sub_id = self.iterator.get_next(sub_id)
             if sub_id is None:
                 break
-            yield self.subtree + sub_id
+            yield sub_id
 
     def __call__(self, sub_id):
         assert isinstance(sub_id, tuple)
@@ -352,7 +352,7 @@ class MIBTable(dict):
 
             val1 = mib_entry(key1)
             if val1 is None:
-                # handler returned None, which implies there's no data, keep walking.
+                logger.error('MIBTable.get_next found an invalid key: {}+{}'.format(mib_entry.subtree, key1))
                 remaining_oids = remaining_oids[1:]
                 continue
 

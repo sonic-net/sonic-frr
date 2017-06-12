@@ -38,7 +38,6 @@ class TestGetNextPDU(TestCase):
         # self.assertEqual(n, 7)
         value0 = response.values[0]
         self.assertEqual(value0.type_, ValueType.INTEGER)
-        print("test_getnextpdu_exactmatch: ", str(oid))
         self.assertEqual(str(value0.name), str(ObjectIdentifier(11, 0, 1, 0, (1, 3, 6, 1, 2, 1, 2, 2, 1, 1, 1))))
         self.assertEqual(value0.data, 0)
 
@@ -58,7 +57,6 @@ class TestGetNextPDU(TestCase):
         # self.assertEqual(n, 7)
         value0 = response.values[0]
         self.assertEqual(value0.type_, ValueType.INTEGER)
-        print("test_getnextpdu_exactmatch: ", str(oid))
         self.assertEqual(str(value0.name), str(ObjectIdentifier(11, 0, 1, 0, (1, 3, 6, 1, 2, 1, 2, 2, 1, 1, 1))))
         self.assertEqual(value0.data, 0)
 
@@ -77,7 +75,6 @@ class TestGetNextPDU(TestCase):
         # self.assertEqual(n, 7)
         value0 = response.values[0]
         self.assertEqual(value0.type_, ValueType.INTEGER)
-        print("test_getnextpdu_exactmatch: ", str(oid))
         self.assertEqual(str(value0.name), str(ObjectIdentifier(11, 0, 1, 0, (1, 3, 6, 1, 2, 1, 2, 2, 1, 1, 5))))
         self.assertEqual(value0.data, 4)
 

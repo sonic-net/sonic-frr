@@ -9,8 +9,13 @@ sys.path.insert(0, os.path.join(modules_path, 'src'))
 
 from unittest import TestCase
 
+from ax_interface import ValueType
 from ax_interface.pdu import PDU
 from ax_interface.mib import MIBTable
+from ax_interface.pdu_implementations import GetPDU, GetNextPDU
+from ax_interface.encodings import ObjectIdentifier
+from ax_interface.constants import PduTypes
+from ax_interface.pdu import PDU, PDUHeader
 from sonic_ax_impl.mibs.ietf import rfc2863
 
 
@@ -18,6 +23,25 @@ class TestGetNextPDU(TestCase):
     @classmethod
     def setUpClass(cls):
         cls.lut = MIBTable(rfc2863.InterfaceMIBObjects)
+
+    def test_getnextpdu_firstifalias(self):
+        # oid.include = 1
+        oid = ObjectIdentifier(10, 0, 1, 0, (1, 3, 6, 1, 2, 1, 31, 1, 1, 1, 18))
+        get_pdu = GetNextPDU(
+            header=PDUHeader(1, PduTypes.GET, 16, 0, 42, 0, 0, 0),
+            oids=[oid]
+        )
+
+        encoded = get_pdu.encode()
+        response = get_pdu.make_response(self.lut)
+        print(response)
+
+        n = len(response.values)
+        # self.assertEqual(n, 7)
+        value0 = response.values[0]
+        self.assertEqual(value0.type_, ValueType.OCTET_STRING)
+        self.assertEqual(str(value0.name), str(ObjectIdentifier(11, 0, 1, 0, (1, 3, 6, 1, 2, 1, 31, 1, 1, 1, 18, 1))))
+        self.assertEqual(str(value0.data), 'Ethernet0')
 
     def test_get_next_alias(self):
         if_alias = b'\x01\x06\x10\x00\x00\x00\x00o\x00\x01\xcc4\x00\x01\xcc5\x00\x00\x000\x07\x02\x00\x00\x00\x00\x00\x01\x00\x00\x00\x1f\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x11\x00\x00\x00}\x03\x02\x00\x00\x00\x00\x00\x01\x00\x00\x00\x1f\x00\x00\x00\x02'
