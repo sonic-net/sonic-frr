@@ -13,6 +13,8 @@ class FdbUpdater(MIBUpdater):
     def __init__(self):
         super().__init__()
         self.db_conn = mibs.init_db()
+
+        self.prev_if_id_map = {}
         self.reinit_data()
         # call our update method once to "seed" data before the "Agent" starts accepting requests.
         self.update_data()
@@ -26,6 +28,11 @@ class FdbUpdater(MIBUpdater):
         self.if_id_map, \
         self.oid_sai_map, \
         self.oid_name_map = mibs.init_sync_d_interface_tables(self.db_conn)
+
+        ## Note: if if_id_map update, invalid_port_oids should be initialized to empty set
+        if self.prev_if_id_map != self.if_id_map:
+            self.prev_if_id_map = self.if_id_map
+            self.invalid_port_oids = set()
 
     def update_data(self):
         """
@@ -54,11 +61,14 @@ class FdbUpdater(MIBUpdater):
                 port_oid = port_oid[6:]
 
             ## Note: broadcom SAI 0.94 behavior
-            ## Some FDB_ENTRY's port_oid starts with 0x2 is LAG. The whole FDB_ENTRY is not expected, 
+            ## Some FDB_ENTRY's port_oid starts with 0x2 is LAG. The whole FDB_ENTRY is not expected,
             ## and should be ignored here
             ## TODO: revisit logic here for LAG in VLAN
             if port_oid not in self.if_id_map:
-                mibs.logger.info("SyncD 'ASIC_DB' includes a FDB_ENTRY '{}' with an invalid interface id '{}'.".format(fdb_str, port_oid))
+                ## Reduce the logger amount by remember it in a set
+                if port_oid not in self.invalid_port_oids:
+                    self.invalid_port_oids.add(port_oid)
+                    mibs.logger.info("SyncD 'ASIC_DB' includes a FDB_ENTRY '{}' with an invalid interface id '{}'.".format(fdb_str, port_oid))
                 continue
             vlanmac = fdb_vlanmac(fdb)
             self.vlanmac_ifindex_map[vlanmac] = mibs.get_index(self.if_id_map[port_oid])
