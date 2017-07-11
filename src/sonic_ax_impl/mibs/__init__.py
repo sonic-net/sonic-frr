@@ -172,13 +172,17 @@ def init_sync_d_lag_tables(db_conn):
     for lag_entry in lag_entries:
         lag_name = lag_entry[len(b"LAG_TABLE:"):]
         lag_members = db_conn.keys(APPL_DB, b"LAG_MEMBER_TABLE:%s:*" % lag_name)
+        # TODO: db_conn.keys() should really return [] instead of None
+        if lag_members is None:
+            lag_members = []
 
         def member_name_str(val, lag_name):
             return val[len(b"LAG_MEMBER_TABLE:%s:" % lag_name):]
 
-        lag_name_if_name_map[lag_name] = [member_name_str(m, lag_name) for m in lag_members]
-        for key, val in lag_name_if_name_map.items():
-            if_name_lag_name_map[key] = val
+        lag_member_names = [member_name_str(m, lag_name) for m in lag_members]
+        lag_name_if_name_map[lag_name] = lag_member_names
+        for lag_member_name in lag_member_names:
+            if_name_lag_name_map[lag_member_name] = lag_name
 
     for if_name in lag_name_if_name_map.keys():
         idx = get_index(if_name)
