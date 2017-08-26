@@ -32,6 +32,7 @@ class SonicMIB(
     ieee802_1ab.LLDPRemTable,
     dell.force10.SSeriesMIB,
     cisco.mgmt.CiscoSystemExtMIB,
+    cisco.bgp4.CiscoBgp4MIB,
     cisco.ciscoPfcExtMIB.cpfcIfTable,
     cisco.ciscoPfcExtMIB.cpfcIfPriorityTable,
     cisco.ciscoSwitchQosMIB.csqIfQosGroupStatsTable,
