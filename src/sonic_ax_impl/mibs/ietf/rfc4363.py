@@ -34,6 +34,23 @@ class FdbUpdater(MIBUpdater):
             self.prev_if_id_map = self.if_id_map
             self.invalid_port_oids = set()
 
+        ## Note: get the bridge port ID to port ID mapping
+        ## In FDB entry, the bridge port ID is available which is one-to-one mapping with port ID
+        ## TODO: LAG in VLAN is to be supported
+        self.if_bpid_map = {}
+        self.db_conn.connect(mibs.ASIC_DB)
+        bridge_port_strings = self.db_conn.keys(mibs.ASIC_DB, "ASIC_STATE:SAI_OBJECT_TYPE_BRIDGE_PORT:*")
+
+        if not bridge_port_strings:
+            return
+
+        for s in bridge_port_strings:
+            # Example output: ASIC_STATE:SAI_OBJECT_TYPE_BRIDGE_PORT:oid:0x3a000000000616
+            bridge_port_id = s[45:]
+            ent = self.db_conn.get_all(mibs.ASIC_DB, s, blocking=True)
+            port_id = ent[b"SAI_BRIDGE_PORT_ATTR_PORT_ID"][6:]
+            self.if_bpid_map[bridge_port_id] = port_id
+
     def update_data(self):
         """
         Update redis (caches config)
@@ -56,22 +73,12 @@ class FdbUpdater(MIBUpdater):
                 break
 
             ent = self.db_conn.get_all(mibs.ASIC_DB, s, blocking=True)
-            port_oid = ent[b"SAI_FDB_ENTRY_ATTR_PORT_ID"]
-            if port_oid.startswith(b"oid:0x"):
-                port_oid = port_oid[6:]
+            # Example output: oid:0x3a000000000608
+            bridge_port_id = ent[b"SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID"][6:]
+            port_id = self.if_bpid_map[bridge_port_id]
 
-            ## Note: broadcom SAI 0.94 behavior
-            ## Some FDB_ENTRY's port_oid starts with 0x2 is LAG. The whole FDB_ENTRY is not expected,
-            ## and should be ignored here
-            ## TODO: revisit logic here for LAG in VLAN
-            if port_oid not in self.if_id_map:
-                ## Reduce the logger amount by remember it in a set
-                if port_oid not in self.invalid_port_oids:
-                    self.invalid_port_oids.add(port_oid)
-                    mibs.logger.info("SyncD 'ASIC_DB' includes a FDB_ENTRY '{}' with an invalid interface id '{}'.".format(fdb_str, port_oid))
-                continue
             vlanmac = fdb_vlanmac(fdb)
-            self.vlanmac_ifindex_map[vlanmac] = mibs.get_index(self.if_id_map[port_oid])
+            self.vlanmac_ifindex_map[vlanmac] = mibs.get_index(self.if_id_map[port_id])
             self.vlanmac_ifindex_list.append(vlanmac)
         self.vlanmac_ifindex_list.sort()
 
