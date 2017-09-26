@@ -48,8 +48,9 @@ class FdbUpdater(MIBUpdater):
             # Example output: ASIC_STATE:SAI_OBJECT_TYPE_BRIDGE_PORT:oid:0x3a000000000616
             bridge_port_id = s[45:]
             ent = self.db_conn.get_all(mibs.ASIC_DB, s, blocking=True)
-            port_id = ent[b"SAI_BRIDGE_PORT_ATTR_PORT_ID"][6:]
-            self.if_bpid_map[bridge_port_id] = port_id
+            if b"SAI_BRIDGE_PORT_ATTR_PORT_ID" in ent:
+                port_id = ent[b"SAI_BRIDGE_PORT_ATTR_PORT_ID"][6:]
+                self.if_bpid_map[bridge_port_id] = port_id
 
     def update_data(self):
         """
