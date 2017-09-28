@@ -2,14 +2,13 @@ import pprint
 import re
 
 from swsssdk import SonicV2Connector
-
+from swsssdk import port_util
+from swsssdk.port_util import get_index
 from sonic_ax_impl import logger, _if_alias_map
 
 COUNTERS_PORT_NAME_MAP = b'COUNTERS_PORT_NAME_MAP'
 LAG_TABLE = b'LAG_TABLE'
 LAG_MEMBER_TABLE = b'LAG_MEMBER_TABLE'
-SONIC_ETHERNET_RE_PATTERN = "^Ethernet(\d+)$"
-SONIC_PORTCHANNEL_RE_PATTERN = "^PortChannel(\d+)$"
 APPL_DB = 'APPL_DB'
 ASIC_DB = 'ASIC_DB'
 COUNTERS_DB = 'COUNTERS_DB'
@@ -48,32 +47,6 @@ def lag_entry_table(lag_name):
     return b'LAG_TABLE:' + lag_name
 
 
-def get_index(if_name):
-    """
-    OIDs are 1-based, interfaces are 0-based, return the 1-based index
-    Ethernet N = N + 1
-    PortChannel N = N + 1000
-    """
-    return get_index_from_str(if_name.decode())
-
-
-def get_index_from_str(if_name):
-    """
-    OIDs are 1-based, interfaces are 0-based, return the 1-based index
-    Ethernet N = N + 1
-    PortChannel N = N + 1000
-    """
-    patterns = {
-        SONIC_ETHERNET_RE_PATTERN: 1,
-        SONIC_PORTCHANNEL_RE_PATTERN: 1000
-    }
-
-    for pattern, baseidx in patterns.items():
-        match = re.match(pattern, if_name)
-        if match:
-            return int(match.group(1)) + baseidx
-
-
 def config(**kwargs):
     global redis_kwargs
     redis_kwargs = {k:v for (k,v) in kwargs.items() if k in ['unix_socket_path', 'host', 'port']}
@@ -101,13 +74,8 @@ def init_sync_d_interface_tables(db_conn):
 
     # { if_name (SONiC) -> sai_id }
     # ex: { "Ethernet76" : "1000000000023" }
-    if_name_map = db_conn.get_all(COUNTERS_DB, COUNTERS_PORT_NAME_MAP, blocking=True)
+    if_name_map, if_id_map = port_util.get_interface_oid_map(db_conn)
     logger.debug("Port name map:\n" + pprint.pformat(if_name_map, indent=2))
-
-    # { sai_id -> if_name (SONiC) }
-    if_id_map = {sai_id: if_name for if_name, sai_id in if_name_map.items()
-                 # only map the interface if it's a style understood to be a SONiC interface.
-                 if get_index(if_name) is not None}
     logger.debug("Interface name map:\n" + pprint.pformat(if_id_map, indent=2))
 
     # { OID -> sai_id }
@@ -128,13 +96,13 @@ def init_sync_d_interface_tables(db_conn):
         # In the event no interface exists that follows the SONiC pattern, no OIDs are able to be registered.
         # A RuntimeError here will prevent the 'main' module from loading. (This is desirable.)
         message = "No interfaces found matching pattern '{}'. SyncD database is incoherent." \
-            .format(SONIC_ETHERNET_RE_PATTERN)
+            .format(port_util.SONIC_ETHERNET_RE_PATTERN)
         logger.error(message)
         raise RuntimeError(message)
     elif len(if_id_map) < len(if_name_map) or len(oid_sai_map) < len(if_name_map):
         # a length mismatch indicates a bad interface name
         logger.warning("SyncD database contains incoherent interface names. Interfaces must match pattern '{}'"
-                       .format(SONIC_ETHERNET_RE_PATTERN))
+                       .format(port_util.SONIC_ETHERNET_RE_PATTERN))
         logger.warning("Port name map:\n" + pprint.pformat(if_name_map, indent=2))
 
     # { SONiC name -> optional rename }

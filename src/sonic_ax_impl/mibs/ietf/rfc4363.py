@@ -2,6 +2,7 @@ import json
 from enum import unique, Enum
 
 from sonic_ax_impl import mibs
+from swsssdk import port_util
 from ax_interface import MIBMeta, ValueType, MIBUpdater, ContextualMIBEntry, SubtreeMIBEntry
 from ax_interface.util import mac_decimals
 from bisect import bisect_right
@@ -34,23 +35,8 @@ class FdbUpdater(MIBUpdater):
             self.prev_if_id_map = self.if_id_map
             self.invalid_port_oids = set()
 
-        ## Note: get the bridge port ID to port ID mapping
-        ## In FDB entry, the bridge port ID is available which is one-to-one mapping with port ID
-        ## TODO: LAG in VLAN is to be supported
-        self.if_bpid_map = {}
-        self.db_conn.connect(mibs.ASIC_DB)
-        bridge_port_strings = self.db_conn.keys(mibs.ASIC_DB, "ASIC_STATE:SAI_OBJECT_TYPE_BRIDGE_PORT:*")
+        self.if_bpid_map = port_util.get_bridge_port_map(self.db_conn)
 
-        if not bridge_port_strings:
-            return
-
-        for s in bridge_port_strings:
-            # Example output: ASIC_STATE:SAI_OBJECT_TYPE_BRIDGE_PORT:oid:0x3a000000000616
-            bridge_port_id = s[45:]
-            ent = self.db_conn.get_all(mibs.ASIC_DB, s, blocking=True)
-            if b"SAI_BRIDGE_PORT_ATTR_PORT_ID" in ent:
-                port_id = ent[b"SAI_BRIDGE_PORT_ATTR_PORT_ID"][6:]
-                self.if_bpid_map[bridge_port_id] = port_id
 
     def update_data(self):
         """
@@ -76,6 +62,8 @@ class FdbUpdater(MIBUpdater):
             ent = self.db_conn.get_all(mibs.ASIC_DB, s, blocking=True)
             # Example output: oid:0x3a000000000608
             bridge_port_id = ent[b"SAI_FDB_ENTRY_ATTR_BRIDGE_PORT_ID"][6:]
+            if bridge_port_id not in self.if_bpid_map:
+                continue
             port_id = self.if_bpid_map[bridge_port_id]
 
             vlanmac = fdb_vlanmac(fdb)
