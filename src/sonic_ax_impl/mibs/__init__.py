@@ -3,7 +3,7 @@ import re
 
 from swsssdk import SonicV2Connector
 from swsssdk import port_util
-from swsssdk.port_util import get_index
+from swsssdk.port_util import get_index, get_index_from_str
 from sonic_ax_impl import logger, _if_alias_map
 
 COUNTERS_PORT_NAME_MAP = b'COUNTERS_PORT_NAME_MAP'
