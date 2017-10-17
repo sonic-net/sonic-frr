@@ -67,16 +67,33 @@ class TestLLDPMIB(TestCase):
 
     def test_subtype(self):
         for entry in range(4, 11):
-            mib_entry = self.lut[(1, 0, 8802, 1, 1, 2, 1, 4, 1, 1, entry, 1)]
+            mib_entry = self.lut[(1, 0, 8802, 1, 1, 2, 1, 4, 1, 1, entry)]
             ret = mib_entry(sub_id=(1,))
             self.assertIsNotNone(ret)
             print(ret)
 
     def test_local_port_identification(self):
-        mib_entry = self.lut[(1, 0, 8802, 1, 1, 2, 1, 3, 7, 1, 3, 1)]
+        mib_entry = self.lut[(1, 0, 8802, 1, 1, 2, 1, 3, 7, 1, 3)]
         ret = mib_entry(sub_id=(1,))
         self.assertEquals(ret, b'Ethernet0')
         print(ret)
+
+    def test_getnextpdu_local_port_identification(self):
+        # oid.include = 1
+        oid = ObjectIdentifier(11, 0, 1, 0, (1, 0, 8802, 1, 1, 2, 1, 3, 7, 1, 3))
+        get_pdu = GetNextPDU(
+            header=PDUHeader(1, PduTypes.GET, 16, 0, 42, 0, 0, 0),
+            oids=[oid]
+        )
+
+        encoded = get_pdu.encode()
+        response = get_pdu.make_response(self.lut)
+
+        n = len(response.values)
+        # self.assertEqual(n, 7)
+        value0 = response.values[0]
+        self.assertEqual(value0.type_, ValueType.OCTET_STRING)
+        self.assertEqual(str(value0.data), "Ethernet0")
 
     def test_lab_breaks(self):
         break1 = b'\x01\x06\x10\x00\x00\x00\x00q\x00\x01\xd1\x02\x00\x01\xd1\x03\x00\x00\x00P\t\x00\x01\x00\x00' \

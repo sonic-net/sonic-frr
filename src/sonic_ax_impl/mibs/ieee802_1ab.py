@@ -2,10 +2,10 @@
 http://www.ieee802.org/1/files/public/MIBs/LLDP-MIB-200505060000Z.txt
 """
 from enum import Enum, unique
+from bisect import bisect_right
 
 from sonic_ax_impl import mibs, logger
-from ax_interface import MIBMeta, ContextualMIBEntry, MIBUpdater, ValueType
-
+from ax_interface import MIBMeta, SubtreeMIBEntry, MIBUpdater, ValueType
 
 @unique
 class LLDPRemoteTables(int, Enum):
@@ -49,6 +49,16 @@ class LLDPUpdater(MIBUpdater):
         self.oid_sai_map, \
         self.oid_name_map = mibs.init_sync_d_interface_tables(self.db_conn)
 
+    def get_next(self, sub_id):
+        """
+        :param sub_id: The 1-based sub-identifier query.
+        :return: the next sub id.
+        """
+        right = bisect_right(self.if_range, sub_id)
+        if right == len(self.if_range):
+            return None
+        return self.if_range[right]
+
     def update_data(self):
         """
         Subclass update data routine. Updates available LLDP counters.
@@ -57,16 +67,24 @@ class LLDPUpdater(MIBUpdater):
         # establish connection to application database.
         self.db_conn.connect(mibs.APPL_DB)
 
+        self.if_range = []
         self.lldp_counters = {}
-        for if_name in self.if_name_map:
+        for if_oid, if_name in self.oid_name_map.items():
             lldp_kvs = self.db_conn.get_all(mibs.APPL_DB, mibs.lldp_entry_table(if_name))
             if not lldp_kvs:
                 continue
+            self.if_range.append((if_oid, ))
             self.lldp_counters.update({if_name: lldp_kvs})
         if not self.lldp_counters:
             logger.warning("0 - b'LLDP_ENTRY_TABLE' is empty. No LLDP information could be retrieved.")
+        self.if_range.sort()
 
     def local_port_id(self, sub_id):
+        if len(sub_id) <= 0:
+            return None
+        sub_id = sub_id[0]
+        if sub_id not in self.oid_name_map:
+            return None
         if_name = self.oid_name_map[sub_id]
         if if_name not in self.lldp_counters:
             # no LLDP data for this interface--we won't report the local interface
@@ -74,6 +92,11 @@ class LLDPUpdater(MIBUpdater):
         return self.if_alias_map[if_name]
 
     def lldp_table_lookup(self, sub_id, table_name):
+        if len(sub_id) <= 0:
+            return None
+        sub_id = sub_id[0]
+        if sub_id not in self.oid_name_map:
+            return None
         if_name = self.oid_name_map[sub_id]
         if if_name not in self.lldp_counters:
             # no LLDP data for this interface
@@ -103,7 +126,6 @@ class LLDPLocPortTable(metaclass=MIBMeta, prefix='.1.0.8802.1.1.2.1.3.7'):
     'lldpLocPortTable'
     """
     lldp_updater = _lldp_updater
-    if_range = lldp_updater.oid_name_map.keys()
 
     # lldpLocPortEntry = '1'
 
@@ -111,7 +133,7 @@ class LLDPLocPortTable(metaclass=MIBMeta, prefix='.1.0.8802.1.1.2.1.3.7'):
 
     # lldpLocPortIdSubtype = '1.2'
 
-    lldpLocPortId = ContextualMIBEntry('1.3', if_range, ValueType.OCTET_STRING, lldp_updater.local_port_id)
+    lldpLocPortId = SubtreeMIBEntry('1.3', lldp_updater, ValueType.OCTET_STRING, lldp_updater.local_port_id)
 
     # lldpLocPortDesc = '1.4'
 
@@ -205,10 +227,9 @@ class LLDPRemTable(metaclass=MIBMeta, prefix='.1.0.8802.1.1.2.1.4.1'):
     }
     """
     lldp_updater = _lldp_updater
-    if_range = lldp_updater.oid_name_map.keys()
 
     lldpRemTimeMark = \
-        ContextualMIBEntry('1.1', if_range, ValueType.TIME_TICKS, lldp_updater.lldp_table_lookup_integer,
+        SubtreeMIBEntry('1.1', lldp_updater, ValueType.TIME_TICKS, lldp_updater.lldp_table_lookup_integer,
                            LLDPRemoteTables(1))
 
     # TODO: Impl.
@@ -221,31 +242,31 @@ class LLDPRemTable(metaclass=MIBMeta, prefix='.1.0.8802.1.1.2.1.4.1'):
     #                        LLDPRemoteTables(3))
 
     lldpRemChassisIdSubtype = \
-        ContextualMIBEntry('1.4', if_range, ValueType.INTEGER, lldp_updater.lldp_table_lookup_integer,
+        SubtreeMIBEntry('1.4', lldp_updater, ValueType.INTEGER, lldp_updater.lldp_table_lookup_integer,
                            LLDPRemoteTables(4))
 
     lldpRemChassisId = \
-        ContextualMIBEntry('1.5', if_range, ValueType.OCTET_STRING, lldp_updater.lldp_table_lookup,
+        SubtreeMIBEntry('1.5', lldp_updater, ValueType.OCTET_STRING, lldp_updater.lldp_table_lookup,
                            LLDPRemoteTables(5))
 
     lldpRemPortIdSubtype = \
-        ContextualMIBEntry('1.6', if_range, ValueType.INTEGER, lldp_updater.lldp_table_lookup_integer,
+        SubtreeMIBEntry('1.6', lldp_updater, ValueType.INTEGER, lldp_updater.lldp_table_lookup_integer,
                            LLDPRemoteTables(6))
 
     lldpRemPortId = \
-        ContextualMIBEntry('1.7', if_range, ValueType.OCTET_STRING, lldp_updater.lldp_table_lookup,
+        SubtreeMIBEntry('1.7', lldp_updater, ValueType.OCTET_STRING, lldp_updater.lldp_table_lookup,
                            LLDPRemoteTables(7))
 
     lldpRemPortDesc = \
-        ContextualMIBEntry('1.8', if_range, ValueType.OCTET_STRING, lldp_updater.lldp_table_lookup,
+        SubtreeMIBEntry('1.8', lldp_updater, ValueType.OCTET_STRING, lldp_updater.lldp_table_lookup,
                            LLDPRemoteTables(8))
 
     lldpRemSysName = \
-        ContextualMIBEntry('1.9', if_range, ValueType.OCTET_STRING, lldp_updater.lldp_table_lookup,
+        SubtreeMIBEntry('1.9', lldp_updater, ValueType.OCTET_STRING, lldp_updater.lldp_table_lookup,
                            LLDPRemoteTables(9))
 
     lldpRemSysDesc = \
-        ContextualMIBEntry('1.10', if_range, ValueType.OCTET_STRING, lldp_updater.lldp_table_lookup,
+        SubtreeMIBEntry('1.10', lldp_updater, ValueType.OCTET_STRING, lldp_updater.lldp_table_lookup,
                            LLDPRemoteTables(10))
 
     # TODO: Impl.
