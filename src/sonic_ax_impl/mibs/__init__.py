@@ -20,7 +20,7 @@ def counter_table(sai_id):
     :param if_name: given sai_id to cast.
     :return: COUNTERS table key.
     """
-    return b'COUNTERS:' + sai_id
+    return b'COUNTERS:oid:0x' + sai_id
 
 
 def lldp_entry_table(if_name):
