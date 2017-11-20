@@ -33,6 +33,7 @@ class SonicMIB(
     dell.force10.SSeriesMIB,
     cisco.mgmt.CiscoSystemExtMIB,
     cisco.bgp4.CiscoBgp4MIB,
+    cisco.ciscoEntityFruControlMIB.cefcFruPowerStatusTable,
 ):
     """
     If SONiC was to create custom MIBEntries, they may be specified here.
