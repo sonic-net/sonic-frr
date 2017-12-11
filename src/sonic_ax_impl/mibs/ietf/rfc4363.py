@@ -3,7 +3,7 @@ from enum import unique, Enum
 
 from sonic_ax_impl import mibs
 from swsssdk import port_util
-from ax_interface import MIBMeta, ValueType, MIBUpdater, ContextualMIBEntry, SubtreeMIBEntry
+from ax_interface import MIBMeta, ValueType, MIBUpdater, SubtreeMIBEntry
 from ax_interface.util import mac_decimals
 from bisect import bisect_right
 
@@ -16,9 +16,14 @@ class FdbUpdater(MIBUpdater):
         self.db_conn = mibs.init_db()
 
         self.prev_if_id_map = {}
-        self.reinit_data()
-        # call our update method once to "seed" data before the "Agent" starts accepting requests.
-        self.update_data()
+        self.if_name_map = {}
+        self.if_alias_map = {}
+        self.if_id_map = {}
+        self.oid_sai_map = {}
+        self.oid_name_map = {}
+        self.vlanmac_ifindex_map = {}
+        self.vlanmac_ifindex_list = []
+        self.if_bpid_map = {}
 
     def reinit_data(self):
         """

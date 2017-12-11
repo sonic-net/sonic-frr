@@ -24,6 +24,12 @@ class TestGetNextPDU(TestCase):
     def setUpClass(cls):
         cls.lut = MIBTable(rfc2863.InterfaceMIBObjects)
 
+    def test_update(self):
+        for updater in self.lut.updater_instances:
+            updater.update_data()
+            updater.reinit_data()
+            updater.update_data()
+
     def test_getnextpdu_firstifalias(self):
         # oid.include = 1
         oid = ObjectIdentifier(10, 0, 1, 0, (1, 3, 6, 1, 2, 1, 31, 1, 1, 1, 18))

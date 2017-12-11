@@ -50,8 +50,8 @@ class ArpUpdater(MIBUpdater):
         super().__init__()
         self.arp_dest_map = {}
         self.arp_dest_list = []
-        # call our update method once to "seed" data before the "Agent" starts accepting requests.
-        self.update_data()
+        self.arp_dest_map = {}
+        self.arp_dest_list = []
 
     def update_data(self):
         self.arp_dest_map = {}
@@ -89,7 +89,8 @@ class NextHopUpdater(MIBUpdater):
     def __init__(self):
         super().__init__()
         self.db_conn = mibs.init_db()
-        self.update_data()
+        self.nexthop_map = {}
+        self.route_list = []
 
     def update_data(self):
         """
@@ -144,7 +145,6 @@ class InterfacesUpdater(MIBUpdater):
     def __init__(self):
         super().__init__()
         self.db_conn = mibs.init_db()
-        self.reinit_data()
 
         self.lag_name_if_name_map = {}
         self.if_name_lag_name_map = {}
@@ -153,8 +153,11 @@ class InterfacesUpdater(MIBUpdater):
         # cache of interface counters
         self.if_counters = {}
         self.if_range = []
-        # call our update method once to "seed" data before the "Agent" starts accepting requests.
-        self.update_data()
+        self.if_name_map = {}
+        self.if_alias_map = {}
+        self.if_id_map = {}
+        self.oid_sai_map = {}
+        self.oid_name_map = {}
 
     def reinit_data(self):
         """

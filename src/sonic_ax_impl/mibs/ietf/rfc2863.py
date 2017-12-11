@@ -49,7 +49,6 @@ class InterfaceMIBUpdater(MIBUpdater):
         super().__init__()
 
         self.db_conn = mibs.init_db()
-        self.reinit_data()
 
         self.lag_name_if_name_map = {}
         self.if_name_lag_name_map = {}
@@ -57,7 +56,14 @@ class InterfaceMIBUpdater(MIBUpdater):
 
         self.if_counters = {}
         self.if_range = []
-        self.update_data()
+        self.if_name_map = {}
+        self.if_alias_map = {}
+        self.if_id_map = {}
+        self.oid_sai_map = {}
+        self.oid_name_map = {}
+        self.lag_name_if_name_map = {}
+        self.if_name_lag_name_map = {}
+        self.oid_lag_name_map = {}
 
     def reinit_data(self):
         """
@@ -69,6 +75,13 @@ class InterfaceMIBUpdater(MIBUpdater):
         self.oid_sai_map, \
         self.oid_name_map = mibs.init_sync_d_interface_tables(self.db_conn)
 
+        self.lag_name_if_name_map, \
+        self.if_name_lag_name_map, \
+        self.oid_lag_name_map = mibs.init_sync_d_lag_tables(self.db_conn)
+
+        self.if_range = sorted(list(self.oid_sai_map.keys()) + list(self.oid_lag_name_map.keys()))
+        self.if_range = [(i,) for i in self.if_range]
+
     def update_data(self):
         """
         Update redis (caches config)
@@ -78,12 +91,6 @@ class InterfaceMIBUpdater(MIBUpdater):
             sai_id: self.db_conn.get_all(mibs.COUNTERS_DB, mibs.counter_table(sai_id), blocking=True)
             for sai_id in self.if_id_map}
 
-        self.lag_name_if_name_map, \
-        self.if_name_lag_name_map, \
-        self.oid_lag_name_map = mibs.init_sync_d_lag_tables(self.db_conn)
-
-        self.if_range = sorted(list(self.oid_sai_map.keys()) + list(self.oid_lag_name_map.keys()))
-        self.if_range = [(i,) for i in self.if_range]
 
     def get_next(self, sub_id):
         """

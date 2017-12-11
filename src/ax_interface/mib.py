@@ -28,8 +28,8 @@ class MIBUpdater:
     def __init__(self):
         self.run_event = asyncio.Event()
         self.frequency = DEFAULT_UPDATE_FREQUENCY
-        self.update_counter = 0
         self.reinit_rate = DEFAULT_REINIT_RATE // DEFAULT_UPDATE_FREQUENCY
+        self.update_counter = self.reinit_rate + 1 # reinit_data when init
 
     async def start(self):
         # Run the update while we are allowed
@@ -93,15 +93,6 @@ class MIBMeta(type):
             for me in static_entries:
                 sub_ids.update({_prefix + me.subtree: me})
                 prefixes.append(_prefix + me.subtree)
-
-            # gather all contextual IDs for each MIB entry--and drop them into the sub-ID listing
-            contextual_entries = (v for v in vars(cls).values() if type(v) is ContextualMIBEntry)
-            for cme in contextual_entries:
-                sub_ids.update({_prefix + cme.subtree: cme})
-                prefixes.append(_prefix + cme.subtree)
-                for sub_id in cme:
-                    sub_ids.update({_prefix + cme.subtree + sub_id: cme})
-
 
             # gather all subtree IDs
             # to support dynamic sub_id in the subtree, not to pour leaves into dictionary
@@ -181,27 +172,6 @@ class MIBEntry:
 
     def get_next(self, sub_id):
         return None
-
-class ContextualMIBEntry(MIBEntry):
-    def __init__(self, subtree, sub_ids, value_type, callable_, *args, updater=None):
-        super().__init__(subtree, value_type, callable_, *args)
-        self.sub_ids = sorted(list(sub_ids))
-        self.sub_ids = [(i,) for i in self.sub_ids]
-
-    def __iter__(self):
-        for sub_id in self.sub_ids:
-            yield sub_id
-
-    def __call__(self, sub_id):
-        if sub_id not in self.sub_ids:
-            return None
-        return self._callable_.__call__(sub_id[0], *self._callable_args)
-
-    def get_next(self, sub_id):
-        right = bisect.bisect_right(self.sub_ids, sub_id)
-        if right == len(self.sub_ids):
-            return None
-        return self.sub_ids[right]
 
 class SubtreeMIBEntry(MIBEntry):
     def __init__(self, subtree, iterator, value_type, callable_, *args, updater=None):
@@ -344,8 +314,9 @@ class MIBTable(dict):
             # is less than our end value--it's a match.
             oid_key = remaining_oids[0]
             mib_entry = self[oid_key]
-            key1 = next(iter(mib_entry)) # get the first sub_id from the mib_etnry
-            if key1 is None:
+            try:
+                key1 = next(iter(mib_entry)) # get the first sub_id from the mib_etnry
+            except StopIteration:
                 # handler returned None, which implies there's no data, keep walking.
                 remaining_oids = remaining_oids[1:]
                 continue

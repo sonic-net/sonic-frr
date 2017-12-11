@@ -3,7 +3,7 @@ import ipaddress
 from enum import unique, Enum
 
 from sonic_ax_impl import mibs
-from ax_interface import MIBMeta, ValueType, MIBUpdater, ContextualMIBEntry, SubtreeMIBEntry
+from ax_interface import MIBMeta, ValueType, MIBUpdater, SubtreeMIBEntry
 from ax_interface.encodings import OctetString
 from ax_interface.util import mac_decimals, ip2tuple_v4
 from bisect import bisect_right
@@ -13,7 +13,8 @@ class RouteUpdater(MIBUpdater):
         super().__init__()
         self.tos = 0 # ipCidrRouteTos
         self.db_conn = mibs.init_db()
-        self.update_data()
+        self.route_dest_map = {}
+        self.route_dest_list = []
 
     def update_data(self):
         """

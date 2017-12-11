@@ -31,13 +31,16 @@ class LLDPUpdater(MIBUpdater):
         super().__init__()
 
         self.db_conn = mibs.init_db()
-        self.reinit_data()
+        self.if_name_map = {}
+        self.if_alias_map = {}
+        self.if_id_map = {}
+        self.oid_sai_map = {}
+        self.oid_name_map = {}
+        self.if_range = []
 
         # cache of interface counters
         # { sai_id -> { 'counter': 'value' } }
         self.lldp_counters = {}
-        # call our update method once to "seed" data before the "Agent" starts accepting requests.
-        self.update_data()
 
     def reinit_data(self):
         """

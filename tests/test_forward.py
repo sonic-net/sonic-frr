@@ -24,7 +24,9 @@ class TestForwardMIB(TestCase):
         cls.lut = MIBTable(SonicMIB)
 
     def test_update(self):
-        for updater in TestForwardMIB.lut.updater_instances:
+        for updater in self.lut.updater_instances:
+            updater.update_data()
+            updater.reinit_data()
             updater.update_data()
 
     def test_network_order(self):
