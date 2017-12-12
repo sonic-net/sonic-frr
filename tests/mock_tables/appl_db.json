@@ -333,6 +333,14 @@
     "ifname": "Ethernet0,Ethernet4,Ethernet8,Ethernet12,Ethernet16,Ethernet20,Ethernet24,Ethernet28,Ethernet32,Ethernet36,Ethernet40,Ethernet44,Ethernet48,Ethernet52",
     "nexthop": "10.0.0.1,10.0.0.3,10.0.0.5,10.0.0.7,10.0.0.9,10.0.0.11,10.0.0.13,10.0.0.15,10.0.0.17,10.0.0.19,10.0.0.21,10.0.0.23,10.0.0.25,10.0.0.27"
   },
+  "ROUTE_TABLE:10.1.0.32": {
+    "nexthop": "",
+    "ifname": "lo"
+  },
+  "ROUTE_TABLE:fc00:1::32": {
+    "nexthop": "",
+    "ifname": "lo"
+  },
   "LAG_MEMBER_TABLE:PortChannel01:Ethernet112": {
    "status": "enabled"
   },
@@ -369,5 +377,13 @@
     "admin_status": "up",
     "oper_status": "up",
     "mtu": "9216"
+  },
+  "INTF_TABLE:lo:10.1.0.32": {
+    "scope": "global",
+    "family": "IPv4"
+  },
+  "INTF_TABLE:lo:fc00:1::32": {
+    "scope": "global",
+    "family": "IPv6"
   }
 }

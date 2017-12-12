@@ -15,6 +15,27 @@ class RouteUpdater(MIBUpdater):
         self.db_conn = mibs.init_db()
         self.route_dest_map = {}
         self.route_dest_list = []
+        ## loopback ip string -> ip address object
+        self.loips = {}
+
+    def reinit_data(self):
+        """
+        Subclass update loopback information
+        """
+        self.loips = {}
+
+        self.db_conn.connect(mibs.APPL_DB)
+        loopbacks = self.db_conn.keys(mibs.APPL_DB, "INTF_TABLE:lo:*")
+        if not loopbacks:
+            return
+
+        # collect only ipv4 interfaces
+        for loopback in loopbacks:
+            lostr = loopback.decode()
+            loip = lostr[len("INTF_TABLE:lo:"):]
+            ipa = ipaddress.ip_address(loip)
+            if isinstance(ipa, ipaddress.IPv4Address):
+                self.loips[loip] = ipa
 
     def update_data(self):
         """
@@ -45,11 +66,22 @@ class RouteUpdater(MIBUpdater):
                     sub_id = ip2tuple_v4(ipn.network_address) + ip2tuple_v4(ipn.netmask) + (self.tos,) + ip2tuple_v4(nh)
                     self.route_dest_list.append(sub_id)
                     self.route_dest_map[sub_id] = ipn.network_address.packed
+            elif ipnstr in self.loips:
+                ## Note: ipv4 /32 or ipv6 /128 routes will has no prefix ending
+                sub_id = ip2tuple_v4(ipnstr) + (255, 255, 255, 255) + (self.tos,) + (0, 0, 0, 0)
+                self.route_dest_list.append(sub_id)
+                self.route_dest_map[sub_id] = self.loips[ipnstr].packed
 
         self.route_dest_list.sort()
 
     def route_dest(self, sub_id):
         return self.route_dest_map.get(sub_id, None)
+
+    def route_status(self, sub_id):
+        if sub_id in self.route_dest_map:
+            return 1 ## active
+        else:
+            return None
 
     def get_next(self, sub_id):
         right = bisect_right(self.route_dest_list, sub_id)
@@ -67,3 +99,6 @@ class IpCidrRouteTable(metaclass=MIBMeta, prefix='.1.3.6.1.2.1.4.24.4'):
 
     ipCidrRouteDest = \
         SubtreeMIBEntry('1.1', route_updater, ValueType.IP_ADDRESS, route_updater.route_dest)
+
+    ipCidrRouteStatus = \
+        SubtreeMIBEntry('1.16', route_updater, ValueType.INTEGER, route_updater.route_status)
