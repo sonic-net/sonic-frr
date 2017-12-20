@@ -11,7 +11,7 @@ import sys
 import ax_interface
 from sonic_ax_impl.mibs import ieee802_1ab
 from . import logger
-from .mibs.ietf import rfc1213, rfc2863, rfc4292, rfc4363
+from .mibs.ietf import rfc1213, rfc2737, rfc2863, rfc4292, rfc4363
 from .mibs.vendor import dell
 
 # Background task update frequency ( in seconds )
@@ -24,6 +24,7 @@ shutdown_task = None
 class SonicMIB(
     rfc1213.InterfacesMIB,
     rfc1213.IpMib,
+    rfc2737.PhysicalTableMIB,
     rfc2863.InterfaceMIBObjects,
     rfc4363.QBridgeMIBObjects,
     rfc4292.IpCidrRouteTable,
