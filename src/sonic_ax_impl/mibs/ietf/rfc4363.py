@@ -15,7 +15,6 @@ class FdbUpdater(MIBUpdater):
         super().__init__()
         self.db_conn = mibs.init_db()
 
-        self.prev_if_id_map = {}
         self.if_name_map = {}
         self.if_alias_map = {}
         self.if_id_map = {}
@@ -34,11 +33,6 @@ class FdbUpdater(MIBUpdater):
         self.if_id_map, \
         self.oid_sai_map, \
         self.oid_name_map = mibs.init_sync_d_interface_tables(self.db_conn)
-
-        ## Note: if if_id_map update, invalid_port_oids should be initialized to empty set
-        if self.prev_if_id_map != self.if_id_map:
-            self.prev_if_id_map = self.if_id_map
-            self.invalid_port_oids = set()
 
         self.if_bpid_map = port_util.get_bridge_port_map(self.db_conn)
 
