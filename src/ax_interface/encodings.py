@@ -313,9 +313,9 @@ class ValueRepresentation(namedtuple('_ValueRepresentation', ('type_', 'reserved
 
         typed_bind = constants.ValueType(self.type_)
         if typed_bind in self.FOUR_BYTE_TYPES:
-            byte_string += struct.pack(endianness + 'L', self.data)
+            byte_string += struct.pack(endianness + 'L', self.data & 0x00000000ffffffff)
         elif typed_bind == constants.ValueType.COUNTER_64:
-            byte_string += struct.pack(endianness + 'Q', self.data)
+            byte_string += struct.pack(endianness + 'Q', self.data & 0xffffffffffffffff)
         elif typed_bind == constants.ValueType.OBJECT_IDENTIFIER or typed_bind in self.OCTET_STRINGS:
             byte_string += self.data.to_bytes(endianness)
         elif typed_bind in self.EMPTY_TYPES:
