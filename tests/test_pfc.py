@@ -115,7 +115,7 @@ class TestPfcPortCounters(TestCase):
         value0 = response.values[0]
         self.assertEqual(value0.type_, ValueType.INTEGER)
         self.assertEqual(str(value0.name), str(oid))
-        self.assertEqual(value0.data, 1)
+        self.assertEqual(value0.data, 209347219842134092490 % pow(2, 32)) # Test integer truncation
 
     def test_getNextPduRequestForPriority(self):
         oid = ObjectIdentifier(8, 0, 0, 0, (1, 3, 6, 1, 4, 1, 9, 9, 813, 1, 2, 1, 2, 1, 2))
@@ -202,4 +202,4 @@ class TestPfcPortCounters(TestCase):
         value0 = response.values[0]
         self.assertEqual(value0.type_, ValueType.INTEGER)
         self.assertEqual(str(value0.name), str(expected_oid))
-        self.assertEqual(value0.data, 1)
+        self.assertEqual(value0.data, 209347219842134092490 % pow(2, 32)) # Test integer truncation

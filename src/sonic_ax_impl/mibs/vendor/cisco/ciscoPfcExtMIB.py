@@ -94,7 +94,7 @@ class PfcUpdater(MIBUpdater):
 
         try:
             counter_value = self.if_counters[sai_id][_counter_name]
-            counter_value = int(counter_value)
+            counter_value = int(counter_value) & 0x00000000ffffffff
             # done!
             return counter_value
         except KeyError as e:
