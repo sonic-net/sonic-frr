@@ -146,16 +146,16 @@ class PfcUpdater(MIBUpdater):
 class PfcPrioUpdater(PfcUpdater):
     def __init__(self):
         super().__init__()
-        self.min_prio = 1
-        self.max_prio = 8
+        self.min_prio = 0
+        self.max_prio = 7
 
     def queue_index(self, sub_id):
         """
-        :param sub_id: The 1-based sub-identifier query.
+        :param sub_id: The 0-based sub-identifier query.
         :return: the 0-based interface ID.
         """
         if len(sub_id) >= 2:
-            return sub_id[1] - 1
+            return sub_id[1]
         return None
 
     def get_next(self, sub_id):
@@ -186,7 +186,7 @@ class PfcPrioUpdater(PfcUpdater):
 
     def requests_per_priority(self, sub_id):
         """
-        :param sub_id: The 1-based sub-identifier query.
+        :param sub_id: The 0-based sub-identifier query.
         :return: the counter for the respective sub_id/table.
         """        
         port_oid = ''
@@ -216,7 +216,7 @@ class PfcPrioUpdater(PfcUpdater):
 
     def indications_per_priority(self, sub_id):
         """
-        :param sub_id: The 1-based sub-identifier query.
+        :param sub_id: The 0-based sub-identifier query.
         :return: the counter for the respective sub_id/table.
         """
         port_oid = ''
