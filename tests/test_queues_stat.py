@@ -40,7 +40,7 @@ class TestQueueCounters(TestCase):
             print(response)
 
             value0 = response.values[0]
-            self.assertEqual(value0.type_, ValueType.INTEGER)
+            self.assertEqual(value0.type_, ValueType.COUNTER_64)
             self.assertEqual(str(value0.name), str(oid))
             self.assertEqual(value0.data, 1)
 
@@ -57,9 +57,9 @@ class TestQueueCounters(TestCase):
         print(response)
 
         value0 = response.values[0]
-        self.assertEqual(value0.type_, ValueType.INTEGER)
+        self.assertEqual(value0.type_, ValueType.COUNTER_64)
         self.assertEqual(str(value0.name), str(expected_oid))
-        self.assertEqual(value0.data, 23492723984237432 & 0x00000000ffffffff) # Test integer truncation
+        self.assertEqual(value0.data, 23492723984237432 % pow(2, 64)) # Test integer truncation
 
     def test_getIngressQueueCounters(self):
         oid = ObjectIdentifier(8, 0, 0, 0, (1, 3, 6, 1, 4, 1, 9, 9, 580, 1, 5, 5, 1, 4, 1, 1, 1, 1))
@@ -105,6 +105,6 @@ class TestQueueCounters(TestCase):
         response = get_pdu.make_response(self.lut)
 
         value0 = response.values[0]
-        self.assertEqual(value0.type_, ValueType.INTEGER)
+        self.assertEqual(value0.type_, ValueType.COUNTER_64)
         self.assertEqual(str(value0.name), str(expected_oid))
         self.assertEqual(value0.data, 1)

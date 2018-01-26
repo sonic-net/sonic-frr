@@ -198,7 +198,7 @@ class QueueStatUpdater(MIBUpdater):
         # if_index, if_direction, queue_index and counter id should be passed
 
         if sub_id in self.mib_oid_to_queue_map:
-            return self.mib_oid_to_queue_map[sub_id] & 0x00000000ffffffff
+            return self.mib_oid_to_queue_map[sub_id] & 0xffffffffffffffff
         else:
             return None
 
@@ -213,4 +213,4 @@ class csqIfQosGroupStatsTable(metaclass=MIBMeta, prefix='.1.3.6.1.4.1.9.9.580.1.
     # csqIfQosGroupStatsEntry = '1.3.6.1.4.1.9.9.580.1.5.5.1.4'
 
     queue_stat_request = \
-        SubtreeMIBEntry('1.4', queue_updater, ValueType.INTEGER, queue_updater.handle_stat_request)
+        SubtreeMIBEntry('1.4', queue_updater, ValueType.COUNTER_64, queue_updater.handle_stat_request)
