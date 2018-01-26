@@ -31,6 +31,9 @@ class SonicMIB(
     ieee802_1ab.LLDPLocPortTable,
     ieee802_1ab.LLDPRemTable,
     dell.force10.SSeriesMIB,
+    cisco.ciscoPfcExtMIB.cpfcIfTable,
+    cisco.ciscoPfcExtMIB.cpfcIfPriorityTable,
+    cisco.ciscoSwitchQosMIB.csqIfQosGroupStatsTable,
     cisco.ciscoEntityFruControlMIB.cefcFruPowerStatusTable,
 ):
     """
