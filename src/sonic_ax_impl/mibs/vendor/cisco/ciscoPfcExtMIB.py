@@ -94,7 +94,7 @@ class PfcUpdater(MIBUpdater):
 
         try:
             counter_value = self.if_counters[sai_id][_counter_name]
-            counter_value = int(counter_value) & 0x00000000ffffffff
+            counter_value = int(counter_value) & 0xffffffffffffffff
             # done!
             return counter_value
         except KeyError as e:
@@ -254,10 +254,10 @@ class cpfcIfTable(metaclass=MIBMeta, prefix='.1.3.6.1.4.1.9.9.813.1.1'):
     pfc_updater = PfcUpdater()
 
     ifRequests = \
-        SubtreeMIBEntry('1.1', pfc_updater, ValueType.INTEGER, pfc_updater.cpfc_if_requests)
+        SubtreeMIBEntry('1.1', pfc_updater, ValueType.COUNTER_64, pfc_updater.cpfc_if_requests)
 
     ifIndications = \
-        SubtreeMIBEntry('1.2', pfc_updater, ValueType.INTEGER, pfc_updater.cpfc_if_indications)
+        SubtreeMIBEntry('1.2', pfc_updater, ValueType.COUNTER_64, pfc_updater.cpfc_if_indications)
 
 
 # cpfcIfPriorityTable = '1.2'
@@ -269,7 +269,7 @@ class cpfcIfPriorityTable(metaclass=MIBMeta, prefix='.1.3.6.1.4.1.9.9.813.1.2'):
     pfc_updater = PfcPrioUpdater()
 
     prioRequests = \
-        SubtreeMIBEntry('1.2', pfc_updater, ValueType.INTEGER, pfc_updater.requests_per_priority)
+        SubtreeMIBEntry('1.2', pfc_updater, ValueType.COUNTER_64, pfc_updater.requests_per_priority)
 
     prioIndications = \
-        SubtreeMIBEntry('1.3', pfc_updater, ValueType.INTEGER, pfc_updater.indications_per_priority)
+        SubtreeMIBEntry('1.3', pfc_updater, ValueType.COUNTER_64, pfc_updater.indications_per_priority)
