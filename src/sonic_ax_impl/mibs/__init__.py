@@ -7,6 +7,7 @@ from swsssdk.port_util import get_index, get_index_from_str
 from sonic_ax_impl import logger, _if_alias_map
 
 COUNTERS_PORT_NAME_MAP = b'COUNTERS_PORT_NAME_MAP'
+COUNTERS_QUEUE_NAME_MAP = b'COUNTERS_QUEUE_NAME_MAP'
 LAG_TABLE = b'LAG_TABLE'
 LAG_MEMBER_TABLE = b'LAG_MEMBER_TABLE'
 APPL_DB = 'APPL_DB'
@@ -21,6 +22,16 @@ def counter_table(sai_id):
     :return: COUNTERS table key.
     """
     return b'COUNTERS:oid:0x' + sai_id
+
+def queue_table(sai_id):
+    """
+    :param sai_id: given sai_id to cast.
+    :return: COUNTERS table key.
+    """
+    return b'COUNTERS:' + sai_id
+
+def queue_key(port_index, queue_index):
+    return str(port_index) + ':' + str(queue_index)
 
 
 def lldp_entry_table(if_name):
@@ -158,3 +169,58 @@ def init_sync_d_lag_tables(db_conn):
             oid_lag_name_map[idx] = if_name
 
     return lag_name_if_name_map, if_name_lag_name_map, oid_lag_name_map
+
+def init_sync_d_queue_tables(db_conn):
+    """
+    Initializes queue maps for SyncD-connected MIB(s).
+    :return: tuple(port_queues_map, queue_stat_map)
+    """
+
+    # Make sure we're connected to COUNTERS_DB
+    db_conn.connect(COUNTERS_DB)
+
+    # { Port index : Queue index (SONiC) -> sai_id }
+    # ex: { "1:2" : "1000000000023" }
+    queue_name_map = db_conn.get_all(COUNTERS_DB, COUNTERS_QUEUE_NAME_MAP, blocking=True)
+    logger.debug("Queue name map:\n" + pprint.pformat(queue_name_map, indent=2))
+
+    # Parse the queue_name_map and create the following maps:
+    # port_queues_map -> {"if_index : queue_index" : sai_oid}
+    # queue_stat_map -> {queue stat table name : {counter name : value}}
+    # port_queue_list_map -> {if_index: [sorted queue list]}
+    port_queues_map = {}
+    queue_stat_map = {}
+    port_queue_list_map = {}
+
+    for queue_name, sai_id in queue_name_map.items():
+        port_name, queue_index = queue_name.decode().split(':')
+        queue_index = ''.join(i for i in queue_index if i.isdigit())
+        port_index = get_index_from_str(port_name)
+        key = queue_key(port_index, queue_index)
+        port_queues_map[key] = sai_id
+
+        queue_stat_name = queue_table(sai_id)
+        queue_stat = db_conn.get_all(COUNTERS_DB, queue_stat_name, blocking=False)
+        if queue_stat is not None:
+            queue_stat_map[queue_stat_name] = queue_stat
+
+        if not port_queue_list_map.get(int(port_index)):
+            port_queue_list_map[int(port_index)] = [int(queue_index)]
+        else:
+            port_queue_list_map[int(port_index)].append(int(queue_index))
+
+    # SyncD consistency checks.
+    if not port_queues_map:
+        # In the event no queue exists that follows the SONiC pattern, no OIDs are able to be registered.
+        # A RuntimeError here will prevent the 'main' module from loading. (This is desirable.)
+        logger.error("No queues found in the Counter DB. SyncD database is incoherent.")
+        raise RuntimeError('The port_queues_map is not defined')
+    elif not queue_stat_map:
+        logger.error("No queue stat counters found in the Counter DB. SyncD database is incoherent.")
+        raise RuntimeError('The queue_stat_map is not defined')
+
+    for queues in port_queue_list_map.values():
+        queues.sort()
+
+    return port_queues_map, queue_stat_map, port_queue_list_map
+
