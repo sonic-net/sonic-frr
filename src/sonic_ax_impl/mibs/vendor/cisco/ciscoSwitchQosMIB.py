@@ -1,3 +1,4 @@
+import math
 from enum import unique, Enum
 from bisect import bisect_right
 
@@ -111,13 +112,17 @@ class QueueStatUpdater(MIBUpdater):
         self.mib_oid_list = []
 
         # Sort the ports to keep the OID order in the MIB
-        if_range = sorted(list(self.oid_sai_map.keys()))
+        if_range = list(self.oid_sai_map.keys())
         # Update queue counters for port
         for if_index in if_range:
             if if_index not in self.port_queue_list_map:
                 # Port does not has a queues, continue..
                 continue
             if_queues = self.port_queue_list_map[if_index]
+
+            # The first half of queue id is for ucast, and second half is for mcast
+            # To simulate vendor OID, we wrap queues by half distance
+            pq_count = math.ceil((max(if_queues) + 1) / 2)
 
             for queue in if_queues:
                 # Get queue type and statistics
@@ -129,27 +134,29 @@ class QueueStatUpdater(MIBUpdater):
                 # Add supported counters to MIBs list and store counters values
                 for (counter, counter_type), counter_mib_id in CounterMap.items():
                     # Only egress queues are supported
-                    mib_oid = (if_index, int(DirectionTypes.EGRESS), queue + 1, counter_mib_id)
+                    mib_oid = (if_index, int(DirectionTypes.EGRESS), (queue % pq_count) + 1, counter_mib_id)
 
                     counter_value = 0
                     if queue_type == counter_type:
                         counter_value = int(queue_stat.get(counter, 0))
 
+                        if mib_oid in self.mib_oid_to_queue_map:
+                            continue
                         self.mib_oid_list.append(mib_oid)
                         self.mib_oid_to_queue_map[mib_oid] = counter_value
 
         # Sort the LAG ports to keep the OID order in the MIB
-        lag_range = sorted(list(self.oid_lag_name_map.keys()))
+        lag_range = list(self.oid_lag_name_map.keys())
         # Update queue counters for LAG
         for lag_index in lag_range:
             lag_oid_list = []
             lag_oid_to_queue_map = {}
             # Get counters for each LAG member
-            for lag_member in self.lag_name_if_name_map[self.oid_lag_name_map[lag_index]]:            
+            for lag_member in self.lag_name_if_name_map[self.oid_lag_name_map[lag_index]]:
                 lag_member_queues = []
                 if mibs.get_index(lag_member) not in self.port_queue_list_map:
                     # LAG member does not has a queues, continue..
-                    continue                    
+                    continue
                 lag_member_queues = self.port_queue_list_map[mibs.get_index(lag_member)]
 
                 for queue in lag_member_queues:
@@ -177,6 +184,8 @@ class QueueStatUpdater(MIBUpdater):
             # Append the LAG port counters to the MIB with keeping the OID order
             self.mib_oid_list += lag_oid_list
             self.mib_oid_to_queue_map.update(lag_oid_to_queue_map)
+
+        self.mib_oid_list.sort()
 
     def get_next(self, sub_id):
         """

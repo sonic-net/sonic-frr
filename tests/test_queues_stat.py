@@ -61,6 +61,23 @@ class TestQueueCounters(TestCase):
         self.assertEqual(str(value0.name), str(expected_oid))
         self.assertEqual(value0.data, 23492723984237432 % pow(2, 64)) # Test integer truncation
 
+    def test_getNextPduForQueueCounter_wrapped(self):
+        oid = ObjectIdentifier(8, 0, 0, 0, (1, 3, 6, 1, 4, 1, 9, 9, 580, 1, 5, 5, 1, 4, 1, 2, 1, 2))
+        expected_oid = ObjectIdentifier(8, 0, 0, 0, (1, 3, 6, 1, 4, 1, 9, 9, 580, 1, 5, 5, 1, 4, 1, 2, 1, 3))
+        get_pdu = GetNextPDU(
+            header=PDUHeader(1, PduTypes.GET_NEXT, 16, 0, 42, 0, 0, 0),
+            oids=[oid]
+        )
+
+        encoded = get_pdu.encode()
+        response = get_pdu.make_response(self.lut)
+        print(response)
+
+        value0 = response.values[0]
+        self.assertEqual(value0.type_, ValueType.COUNTER_64)
+        self.assertEqual(str(value0.name), str(expected_oid))
+        self.assertEqual(value0.data, 123459) # Test integer truncation
+
     def test_getIngressQueueCounters(self):
         oid = ObjectIdentifier(8, 0, 0, 0, (1, 3, 6, 1, 4, 1, 9, 9, 580, 1, 5, 5, 1, 4, 1, 1, 1, 1))
         get_pdu = GetPDU(
@@ -77,8 +94,24 @@ class TestQueueCounters(TestCase):
         self.assertEqual(str(value0.name), str(oid))
         self.assertEqual(value0.data, None)
 
-    def test_getMulticastQueueCounters(self):
+    def test_getMulticastQueueCountersWrapped(self):
         oid = ObjectIdentifier(8, 0, 0, 0, (1, 3, 6, 1, 4, 1, 9, 9, 580, 1, 5, 5, 1, 4, 1, 2, 1, 3))
+        get_pdu = GetPDU(
+            header=PDUHeader(1, PduTypes.GET, 16, 0, 42, 0, 0, 0),
+            oids=[oid]
+        )
+
+        encoded = get_pdu.encode()
+        response = get_pdu.make_response(self.lut)
+        print(response)
+
+        value0 = response.values[0]
+        self.assertEqual(value0.type_, ValueType.COUNTER_64)
+        self.assertEqual(str(value0.name), str(oid))
+        self.assertEqual(value0.data, 123459)
+
+    def test_getMulticastQueueCounters(self):
+        oid = ObjectIdentifier(8, 0, 0, 0, (1, 3, 6, 1, 4, 1, 9, 9, 580, 1, 5, 5, 1, 4, 1, 2, 1, 9))
         get_pdu = GetPDU(
             header=PDUHeader(1, PduTypes.GET, 16, 0, 42, 0, 0, 0),
             oids=[oid]
