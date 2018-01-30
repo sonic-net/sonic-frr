@@ -7,8 +7,12 @@ from ax_interface import MIBMeta, ValueType, MIBUpdater, SubtreeMIBEntry
 from ax_interface.util import mac_decimals
 from bisect import bisect_right
 
-def fdb_vlanmac(fdb):
-    return (int(fdb["vlan"]),) + mac_decimals(fdb["mac"])
+def fdb_vlanmac(db_conn, fdb):
+    if 'vlan' in fdb:
+        vlan_id = fdb["vlan"]
+    elif 'bvid' in fdb:
+        vlan_id = port_util.get_vlan_id_from_bvid(db_conn, fdb["bvid"])
+    return (int(vlan_id),) + mac_decimals(fdb["mac"])
 
 class FdbUpdater(MIBUpdater):
     def __init__(self):
@@ -65,7 +69,7 @@ class FdbUpdater(MIBUpdater):
                 continue
             port_id = self.if_bpid_map[bridge_port_id]
 
-            vlanmac = fdb_vlanmac(fdb)
+            vlanmac = fdb_vlanmac(self.db_conn, fdb)
             self.vlanmac_ifindex_map[vlanmac] = mibs.get_index(self.if_id_map[port_id])
             self.vlanmac_ifindex_list.append(vlanmac)
         self.vlanmac_ifindex_list.sort()
