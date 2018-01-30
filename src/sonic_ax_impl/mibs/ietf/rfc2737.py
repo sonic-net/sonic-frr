@@ -55,7 +55,7 @@ class PhysicalTableMIBUpdater(MIBUpdater):
             self.physical_classes = [(self.CHASSIS_ID, )]
             self.physical_classes_map = {
                     (self.CHASSIS_ID, ): (PhysicalClass.CHASSIS, chassis_serial_number.decode("utf-8"))
-                    }
+                }
 
     def update_data(self):
         """
@@ -107,4 +107,4 @@ class PhysicalTableMIB(metaclass=MIBMeta, prefix='.1.3.6.1.2.1.47.1.1.1'):
         SubtreeMIBEntry('1.5', updater, ValueType.INTEGER, updater.get_physical_class)
 
     entPhysicalSerialNum = \
-        SubtreeMIBEntry('1.1.1.11', updater, ValueType.OCTET_STRING, updater.get_serial_number)
+        SubtreeMIBEntry('1.11', updater, ValueType.OCTET_STRING, updater.get_serial_number)

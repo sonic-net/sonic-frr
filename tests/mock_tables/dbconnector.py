@@ -22,23 +22,22 @@ class SwssSyncClient(mockredis.MockRedis):
         super(SwssSyncClient, self).__init__(strict=True, *args, **kwargs)
         db = kwargs.pop('db')
         if db == 0:
-            with open(INPUT_DIR + '/appl_db.json') as f:
-                db = json.load(f)
-                for h, table in db.items():
-                    for k, v in table.items():
-                        self.hset(h, k, v)
+            fname = 'appl_db.json'
         elif db == 1:
-            with open(INPUT_DIR + '/asic_db.json') as f:
-                db = json.load(f)
-                for h, table in db.items():
-                    for k, v in table.items():
-                        self.hset(h, k, v)
+            fname = 'asic_db.json'
         elif db == 2:
-            with open(INPUT_DIR + '/counters_db.json') as f:
-                db = json.load(f)
-                for h, table in db.items():
-                    for k, v in table.items():
-                        self.hset(h, k, v)
+            fname = 'counters_db.json'
+        elif db == 6:
+            fname = 'state_db.json'
+        else:
+            raise ValueError("Invalid db")
+
+        fname = os.path.join(INPUT_DIR, fname)
+        with open(fname) as f:
+            js = json.load(f)
+            for h, table in js.items():
+                for k, v in table.items():
+                    self.hset(h, k, v)
 
     # Patch mockredis/mockredis/client.py
     # The official implementation will filter out keys with a slash '/'
