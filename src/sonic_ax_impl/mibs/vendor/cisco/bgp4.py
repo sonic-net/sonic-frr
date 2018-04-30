@@ -7,7 +7,8 @@ from ax_interface.mib import MIBEntry
 class BgpSessionUpdater(MIBUpdater):
     def __init__(self):
         super().__init__()
-        self.update_data()
+        self.session_status_map = {}
+        self.session_status_list = []
 
     def update_data(self):
         self.session_status_map = {}

@@ -23,7 +23,7 @@ def vtysh_run(command):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((HOST, PORT))
 
-    cmd = b"zebra\r\n" + command.encode() + b"\r\nexit\r\n"
+    cmd = b"zebra\n" + command.encode() + b"\nexit\n"
     s.send(cmd)
 
     acc = b""
@@ -58,6 +58,8 @@ def parse_bgp_summary(summ):
         l = ls[li]
         if l.startswith('Neighbor        '): break
         if l.startswith('No IPv'): # eg. No IPv6 neighbor is configured
+            return bgpinfo
+        if l.endswith('> exit'): # last command in the lines
             return bgpinfo
         li += 1
 

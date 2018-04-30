@@ -13,30 +13,28 @@ _socket_class = socket.socket
 
 # Monkey patch
 class MockSocket(_socket_class):
-    _instance_count = 0
 
     def __init__(self, *args, **kwargs):
         super(MockSocket, self).__init__(*args, **kwargs)
-        MockSocket._instance_count %= 2
-        MockSocket._instance_count += 1
-        self.first = True
+        self._string_sent = b''
 
     def connect(self, *args, **kwargs):
         pass
 
     def send(self, *args, **kwargs):
+        string = args[0]
+        self._string_sent = string
         pass
 
     def recv(self, *args, **kwargs):
-        if not self.first:
-            return None
-        self.first = False
-
-        if MockSocket._instance_count == 1:
+        if b'show ip bgp summary' in self._string_sent:
             filename = INPUT_DIR + '/bgpsummary_ipv4.txt'
-        elif MockSocket._instance_count == 2:
+        elif b'show ipv6 bgp summary' in self._string_sent:
             filename = INPUT_DIR + '/bgpsummary_ipv6.txt'
+        else:
+            return None
 
+        self._string_sent = b''
         ret = namedtuple('ret', ['returncode', 'stdout'])
         ret.returncode = 0
         with open(filename, 'rb') as f:

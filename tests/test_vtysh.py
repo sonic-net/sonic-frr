@@ -15,11 +15,14 @@ from ax_interface.encodings import ObjectIdentifier
 from ax_interface.constants import PduTypes
 from sonic_ax_impl.mibs.ietf import rfc4363
 from sonic_ax_impl.main import SonicMIB
+from sonic_ax_impl.lib.vtysh_helper import parse_bgp_summary
 
 class TestSonicMIB(TestCase):
     @classmethod
     def setUpClass(cls):
         cls.lut = MIBTable(SonicMIB)
+        for updater in cls.lut.updater_instances:
+            updater.update_data()
 
     def test_getpdu_established(self):
         oid = ObjectIdentifier(20, 0, 0, 0, (1, 3, 6, 1, 4, 1, 9, 9, 187, 1, 2, 5, 1, 3, 1, 4, 10, 0, 0, 61))
@@ -98,3 +101,10 @@ class TestSonicMIB(TestCase):
         self.assertEqual(value0.type_, ValueType.INTEGER)
         self.assertEqual(str(value0.name), str(oid))
         self.assertEqual(value0.data, 6)
+
+    def parse_no_bgp():
+        filename = 'bgpsummary_ipv6_nobgp.txt'
+        with open(filename, 'rb') as f:
+            bgpsu = f.read()
+        bgpsumm_ipv6 = parse_bgp_summary(bgpsu)
+        self.assertEqual(bgpsumm_ipv6, [])
