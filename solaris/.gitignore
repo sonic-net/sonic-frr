@@ -1,5 +1,5 @@
 Makefile
-!Makefile.in
+Makefile.in
 ?.manifest
 *.xml
 pkginfo.*.full
@@ -17,3 +17,6 @@ depend.smf
 frr.init
 *.pkg
 *.pkg.gz
+*~
+*.loT
+*.a

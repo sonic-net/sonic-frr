@@ -777,9 +777,8 @@ static int if_get_ipv4_address(struct interface *ifp, struct in_addr *addr)
 	return 0;
 }
 
-
-bool bgp_zebra_nexthop_set(union sockunion *local, union sockunion *remote,
-			   struct bgp_nexthop *nexthop, struct peer *peer)
+int bgp_nexthop_set(union sockunion *local, union sockunion *remote,
+		    struct bgp_nexthop *nexthop, struct peer *peer)
 {
 	int ret = 0;
 	struct interface *ifp = NULL;
@@ -787,9 +786,9 @@ bool bgp_zebra_nexthop_set(union sockunion *local, union sockunion *remote,
 	memset(nexthop, 0, sizeof(struct bgp_nexthop));
 
 	if (!local)
-		return false;
+		return -1;
 	if (!remote)
-		return false;
+		return -1;
 
 	if (local->sa.sa_family == AF_INET) {
 		nexthop->v4 = local->sin.sin_addr;
@@ -816,24 +815,8 @@ bool bgp_zebra_nexthop_set(union sockunion *local, union sockunion *remote,
 						      peer->bgp->vrf_id);
 	}
 
-	if (!ifp) {
-		/*
-		 * BGP views do not currently get proper data
-		 * from zebra( when attached ) to be able to
-		 * properly resolve nexthops, so give this
-		 * instance type a pass.
-		 */
-		if (peer->bgp->inst_type == BGP_INSTANCE_TYPE_VIEW)
-			return true;
-		/*
-		 * If we have no interface data but we have established
-		 * some connection w/ zebra than something has gone
-		 * terribly terribly wrong here, so say this failed
-		 * If we do not any zebra connection then not
-		 * having a ifp pointer is ok.
-		 */
-		return zclient_num_connects ? false : true;
-	}
+	if (!ifp)
+		return -1;
 
 	nexthop->ifp = ifp;
 
@@ -929,7 +912,7 @@ bool bgp_zebra_nexthop_set(union sockunion *local, union sockunion *remote,
 
 	/* If we have identified the local interface, there is no error for now.
 	 */
-	return true;
+	return 0;
 }
 
 static struct in6_addr *bgp_info_to_ipv6_nexthop(struct bgp_info *info,
@@ -2530,7 +2513,7 @@ stream_failure:		/* for STREAM_GETX */
 
 extern struct zebra_privs_t bgpd_privs;
 
-void bgp_zebra_init(struct thread_master *master, unsigned short instance)
+void bgp_zebra_init(struct thread_master *master)
 {
 	zclient_num_connects = 0;
 
@@ -2569,7 +2552,6 @@ void bgp_zebra_init(struct thread_master *master, unsigned short instance)
 	zclient->ipset_notify_owner = ipset_notify_owner;
 	zclient->ipset_entry_notify_owner = ipset_entry_notify_owner;
 	zclient->iptable_notify_owner = iptable_notify_owner;
-	zclient->instance = instance;
 }
 
 void bgp_zebra_destroy(void)

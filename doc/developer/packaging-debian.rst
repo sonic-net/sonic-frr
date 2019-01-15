@@ -1,16 +1,31 @@
 Debian
 ======
 
-(Tested on Ubuntu 14.04, 16.04, 17.10, 18.04, Debian jessie, stretch and
-buster.)
+(Tested on Ubuntu 12.04, 14.04, 16.04, 17.10, 18.04, Debian 8 and 9)
 
-1. Install the Debian packaging tools:
+.. note::
+
+   If you try to build for a different distro, then it will most likely fail
+   because of the missing backport. See :ref:`deb-backports` about adding a new
+   backport.
+
+1. Install build dependencies for your platform as outlined in :ref:`building`.
+
+2. Install the following additional packages:
+
+   - on Ubuntu 12.04, 14.04, 16.04, 17.10, Debian 8 and 9:
 
    .. code-block:: shell
 
-      sudo apt install fakeroot debhelper devscripts
+      apt-get install realpath equivs groff fakeroot debhelper devscripts
 
-2. Checkout FRR under an **unprivileged** user account:
+   - on Ubuntu 18.04: (realpath is now part of preinstalled by coreutils)
+
+   .. code-block:: shell
+
+      apt-get install equivs groff fakeroot debhelper devscripts
+
+3. Checkout FRR under a **unprivileged** user account:
 
    .. code-block:: shell
 
@@ -23,145 +38,136 @@ buster.)
 
       git checkout <branch>
 
-3. Install build dependencies using the  `mk-build-deps` tool from the
-   `devscripts` package:
+4. Run ``bootstrap.sh`` and make a dist tarball:
+
+   .. code-block:: shell
+
+      ./bootstrap.sh
+      ./configure --with-pkg-extra-version=-MyDebPkgVersion
+      make dist
+
+   .. note::
+
+      Configure parameters are not important for the Debian Package building -
+      except the `with-pkg-extra-version` if you want to give the Debian
+      package a specific name to mark your own unoffical build.
+
+5. Edit :file:`debianpkg/rules` and set the configuration as needed.
+
+   Look for section ``dh_auto_configure`` to modify the configure options as
+   needed. Options might be different between the top-level ``rules``` and
+   :file:`backports/XXXX/debian/rules`. Please adjust as needed on all files.
+
+6. Create backports debian sources
+
+   Rename the :file:`debianpkg` directory to :file:`debian` and create the
+   backports (Debian requires to not ship a :file:`debian` directory inside the
+   source directory to avoid build conflicts with the reserved ``debian``
+   subdirectory name during the build):
+
+   .. code-block:: shell
+
+      mv debianpkg debian
+      make -f debian/rules backports
+
+   This will create a :file:`frr_*.orig.tar.gz` with the source (same as the
+   dist tarball), as well as multiple :file:`frr_*.debian.tar.xz` and
+   :file:`frr_*.dsc` corresponding to each distribution for which a backport is
+   available.
+
+7. Create a new directory to build the package and populate with package
+   source.
+
+   .. code-block:: shell
+
+      mkdir frrpkg
+      cd frrpkg
+      tar xf ~/frr/frr_*.orig.tar.gz
+      cd frr*
+      . /etc/os-release
+      tar xf ~/frr/frr_*${ID}${VERSION_ID}*.debian.tar.xz
+
+8. Build Debian package dependencies and install them as needed.
 
    .. code-block:: shell
 
       sudo mk-build-deps --install debian/control
 
-   Alternatively, you can manually install build dependencies for your
-   platform as outlined in :ref:`building`.
+9. Build Debian Package
 
-4. Run ``tools/tarsource.sh -V``:
-
-   .. code-block:: shell
-
-      ./tools/tarsource.sh -V
-
-   This script sets up the ``debian/changelog-auto`` file with proper version
-   information.
-
-5. (optional) Append a distribution identifier if needed (see below under
-   :ref:`multi-dist`.)
-
-6. Build Debian Package:
+   Building with standard options:
 
    .. code-block:: shell
 
-      dpkg-buildpackage $options
+      debuild -b -uc -us
 
-   Where `$options` may contain any or all of the following items:
+   Or change some options (see `rules` file for available options):
 
-   * build profiles specified with ``-P``, e.g.
-     ``-Ppkg.frr.nortrlib,pkg.frr.nosystemd``.
-     Multiple values are separated by commas and there must not be a space
-     after the ``-P``.
+   .. code-block:: shell
 
-     The following build profiles are currently available:
+      debuild --set-envvar=WANT_BGP_VNC=1 --set-envvar=WANT_CUMULUS_MODE=1 -b -uc -us
 
-     +----------------+-------------------+-----------------------------------------+
-     | Profile        | Negation          | Effect                                  |
-     +================+===================+=========================================+
-     | pkg.frr.rtrlib | pkg.frr.nortrlib  | builds frr-rpki-rtrlib package (or not) |
-     +----------------+-------------------+-----------------------------------------+
-     | n/a            | pkg.frr.nosystemd | removes libsystemd dependency and       |
-     |                |                   | disables unit file installation         |
-     +----------------+-------------------+-----------------------------------------+
+   To build with RPKI:
 
-     .. note::
+   - Download the librtr packages from
+     https://ci1.netdef.org/browse/RPKI-RTRLIB/latestSuccessful/artifact
 
-        The ``pkg.frr.nosystemd`` option is only intended to support Ubuntu
-        14.04 (and should be enabled when building for that.)
+   - install librtr-dev on the build server
 
-   * the ``-uc -us`` options to disable signing the packages with your GPG key
+   Then build with:
 
-     (git builds of the `master` or `stable/X.X` branches won't be signed by
-     default since their target release is set to ``UNRELEASED``.)
+   .. code-block:: shell
 
-7. Done!
+      debuild --set-envvar=WANT_RPKI=1 -b -uc -us
 
-   If all worked correctly, then you should end up with the Debian packages in
-   the parent directory of where `debuild` ran.  If distributed, please make sure
-   you distribute it together with the sources (``frr_*.orig.tar.xz``,
-   ``frr_*.debian.tar.xz`` and ``frr_*.dsc``)
+   RPKI packages have an additonal dependency of ``librtr0`` which can be found
+   at the same URL.
 
-.. note::
+10. Done!
 
-   A package created from `master` or `stable/X.X` is slightly different from
-   a package created from the `debian` branch.  The changelog for the former
-   is autogenerated and sets the Debian revision to ``-0``, which causes an
-   intentional lintian warning.  The `debian` branch on the other hand has
-   a manually maintained changelog that contains proper Debian release
-   versioning.
+If all worked correctly, then you should end up with the Debian packages under
+:file:`frrpkg`. If distributed, please make sure you distribute it together
+with the sources (``frr_*.orig.tar.gz``, ``frr_*.debian.tar.xz`` and
+``frr_*.dsc``)
 
-   Furthermore, official Debian packages are built in ``3.0 (quilt)`` format
-   with an "orig" tarball and a "debian" tarball.  These tarballs are created
-   by the ``tarsource.sh`` tool on any branch.  The git repository however
-   contains a ``3.0 (git)`` source format specifier to easily allow direct
-   git builds.
+.. _deb-backports:
 
+Debian Backports
+----------------
 
-.. _multi-dist:
+The :file:`debianpkg/backports` directory contains the Debian directories for
+backports to other Debian platforms.  These are built via the ``3.0 (custom)``
+source format, which allows one to build a source package directly out of
+tarballs (e.g. an orig.tar.gz tarball and a debian.tar.gz file), at which point
+the format can be changed to a real format (e.g. ``3.0 (quilt)``).
 
-Multi-Distribution builds
-=========================
+Source packages are assembled via targets of the same name as the system to
+which the backport is done (e.g. ``precise``), included in :file:`debian/rules`.
 
-You can optionally append a distribution identifier in case you want to
-make multiple versions of the package available in the same repository.
-Do the following after creating the changelog with `tarsource.sh`:
+To create a new Debian backport:
 
-.. code-block:: shell
+- Add its name to ``KNOWN_BACKPORTS``, defined in :file:`debian/rules`.
+- Create a directory of the same name in :file:`debian/backports`.
+- Add the files ``exclude``, ``versionext``, and ``debian/source/format`` under
+  this directory.
 
-   dch -l '~deb8u' 'build for Debian 8 (jessie)'
-   dch -l '~deb9u' 'build for Debian 9 (stretch)'
-   dch -l '~ubuntu14.04.' 'build for Ubuntu 14.04 (trusty)'
-   dch -l '~ubuntu16.04.' 'build for Ubuntu 16.04 (xenial)'
-   dch -l '~ubuntu18.04.' 'build for Ubuntu 18.04 (bionic)'
+For the last point, these files should contain the following:
 
-Between building packages for specific distributions, the only difference
-in the package itself lies in the automatically generated shared library
-dependencies, e.g. libjson-c2 or libjson-c3.  This means that the
-architecture independent packages should **not** have a suffix appended.
-Also, the current Debian testing/unstable releases should not have any suffix
-appended.
+``exclude``
+   Contains whitespace-separated paths (relative to the root of the source dir)
+   that should be excluded from the source package (e.g.
+   :file:`debian/patches`).
 
-For example, at the end of 2018 (i.e. ``buster``/Debian 10 is the current
-"testing" release), the following is a complete list of `.deb` files for
-Debian 8, 9 and 10 packages for FRR 6.0.1-1 with RPKI support::
+``versionext``
+   Contains the suffix added to the version number for this backport's build.
+   Distributions often have guidelines for what this should be. If left empty,
+   no new :file:`debian/changelog` entry is created.
 
-   frr_6.0.1-1_amd64.deb
-   frr_6.0.1-1~deb8u1_amd64.deb
-   frr_6.0.1-1~deb9u1_amd64.deb
-   frr-dbg_6.0.1-1_amd64.deb
-   frr-dbg_6.0.1-1~deb8u1_amd64.deb
-   frr-dbg_6.0.1-1~deb9u1_amd64.deb
-   frr-rpki-rtrlib_6.0.1-1_amd64.deb
-   frr-rpki-rtrlib_6.0.1-1~deb8u1_amd64.deb
-   frr-rpki-rtrlib_6.0.1-1~deb9u1_amd64.deb
-   frr-doc_6.0.1-1_all.deb
-   frr-pythontools_6.0.1-1_all.deb
+``debian/source/format``
+   Contains the source format of the resulting source package.  As of of the
+   writing of this document the only supported format is ``3.0 (quilt)``.
 
-Note that there are no extra versions of the `frr-doc` and `frr-pythontools`
-packages (because they are for architecture ``all``, not ``amd64``), and the
-version for Debian 10 does **not** have a ``~deb10u1`` suffix.
+- Add appropriate files under the :file:`debian/` subdirectory.  These will be
+  included in the source package, overriding any top-level :file:`debian/`
+  files with equivalent paths.
 
-.. warning::
-
-   Do not use the ``-`` character in the version suffix.  The last ``-`` in
-   the version number is the separator between upstream version and Debian
-   version.  ``6.0.1-1~foobar-2`` means upstream version ``6.0.1-1~foobar``,
-   Debian version ``2``.  This is not what you want.
-
-   The only allowed characters in the Debian version are ``0-9 A-Z a-z + . ~``
-
-.. note::
-
-   The separating character for the suffix **must** be the tilde (``~``)
-   because the tilde is ordered in version-comparison before the empty
-   string.  That means the order of the above packages is the following:
-
-   ``6.0.1-1`` newer than ``6.0.1-1~deb9u1`` newer than ``6.0.1-1~deb8u1``
-
-   If you use another character (e.g. ``+``), the untagged version will be
-   regarded as the "oldest"!

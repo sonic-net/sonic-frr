@@ -13,7 +13,15 @@ https://lede-project.org/docs/guide-developer/install-buildsystem
 
 for
 
-Ubuntu:
+Ubuntu 12.04LTS:
+
+::
+
+    sudo apt-get install build-essential subversion git-core \
+       libncurses5-dev zlib1g-dev gawk flex quilt libssl-dev xsltproc \
+       libxml-parser-perl mercurial bzr ecj cvs unzip python3-sphinx
+
+Ubuntu 64bit:
 
 ::
 

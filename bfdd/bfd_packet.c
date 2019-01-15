@@ -761,9 +761,6 @@ static ssize_t bfd_recv_ipv4(int sd, bool is_mhop, char *port, size_t portlen,
 
 			local->sa_sin.sin_family = AF_INET;
 			local->sa_sin.sin_addr = pi->ipi_addr;
-#ifdef HAVE_STRUCT_SOCKADDR_SA_LEN
-			local->sa_sin.sin_len = sizeof(local->sa_sin);
-#endif /* HAVE_STRUCT_SOCKADDR_SA_LEN */
 			fetch_portname_from_ifindex(pi->ipi_ifindex, port,
 						    portlen);
 			break;
@@ -790,9 +787,6 @@ static ssize_t bfd_recv_ipv4(int sd, bool is_mhop, char *port, size_t portlen,
 			memcpy(&ia, CMSG_DATA(cm), sizeof(ia));
 			local->sa_sin.sin_family = AF_INET;
 			local->sa_sin.sin_addr = ia;
-#ifdef HAVE_STRUCT_SOCKADDR_SA_LEN
-			local->sa_sin.sin_len = sizeof(local->sa_sin);
-#endif /* HAVE_STRUCT_SOCKADDR_SA_LEN */
 			break;
 		}
 #endif /* BFD_BSD */
@@ -873,11 +867,8 @@ ssize_t bfd_recv_ipv6(int sd, bool is_mhop, char *port, size_t portlen,
 		} else if (cm->cmsg_type == IPV6_PKTINFO) {
 			pi6 = (struct in6_pktinfo *)CMSG_DATA(cm);
 			if (pi6) {
-				local->sa_sin6.sin6_family = AF_INET6;
+				local->sa_sin.sin_family = AF_INET6;
 				local->sa_sin6.sin6_addr = pi6->ipi6_addr;
-#ifdef HAVE_STRUCT_SOCKADDR_SA_LEN
-				local->sa_sin6.sin6_len = sizeof(local->sa_sin6);
-#endif /* HAVE_STRUCT_SOCKADDR_SA_LEN */
 				fetch_portname_from_ifindex(pi6->ipi6_ifindex,
 							    port, portlen);
 				ifindex = pi6->ipi6_ifindex;

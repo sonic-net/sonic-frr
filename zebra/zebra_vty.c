@@ -302,7 +302,7 @@ static void vty_show_ip_route_detail(struct vty *vty, struct route_node *rn,
 				if (vrf)
 					vty_out(vty, "(vrf %s)", vrf->name);
 				else
-					vty_out(vty, "(vrf UNKNOWN)");
+					vty_out(vty, "(vrf UKNOWN)");
 			}
 
 			if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_DUPLICATE))
@@ -677,7 +677,7 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 			if (vrf)
 				vty_out(vty, "(vrf %s)", vrf->name);
 			else
-				vty_out(vty, "(vrf UNKNOWN)");
+				vty_out(vty, "(vrf UKNOWN)");
 		}
 
 		if (!CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ACTIVE))

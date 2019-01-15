@@ -1,8 +1,8 @@
-*.m4
-
-!ax_compare_version.m4
-!ax_prog_perl_modules.m4
+Makefile
+Makefile.in
+.arch-inventory
+.arch-ids
+*~
+*.loT
 !ax_pthread.m4
 !ax_sys_weak_alias.m4
-!ax_sys_weak_alias.m4
-!pkg.m4

@@ -54,7 +54,6 @@ static char pidfile_default[512];
 static char vtypath_default[256];
 
 bool debug_memstats_at_exit = 0;
-static bool nodetach_term, nodetach_daemon;
 
 static char comb_optstr[256];
 static struct option comb_lo[64];
@@ -282,8 +281,6 @@ void frr_preinit(struct frr_daemon_info *daemon, int argc, char **argv)
 		opt_extend(&os_zclient);
 	if (!(di->flags & FRR_NO_TCPVTY))
 		opt_extend(&os_vty);
-	if (di->flags & FRR_DETACH_LATER)
-		nodetach_daemon = true;
 
 	snprintf(config_default, sizeof(config_default), "%s/%s.conf",
 		 frr_sysconfdir, di->name);
@@ -768,16 +765,13 @@ void frr_config_fork(void)
 {
 	hook_call(frr_late_init, master);
 
-	if (!(di->flags & FRR_NO_CFG_PID_DRY)) {
-		/* Don't start execution if we are in dry-run mode */
-		if (di->dryrun) {
-			frr_config_read_in(NULL);
-			exit(0);
-		}
-
-		thread_add_event(master, frr_config_read_in, NULL, 0,
-				 &di->read_in);
+	/* Don't start execution if we are in dry-run mode */
+	if (di->dryrun) {
+		frr_config_read_in(NULL);
+		exit(0);
 	}
+
+	thread_add_event(master, frr_config_read_in, NULL, 0, &di->read_in);
 
 	if (di->daemon_mode || di->terminal)
 		frr_daemonize();
@@ -787,7 +781,7 @@ void frr_config_fork(void)
 	pid_output(di->pid_file);
 }
 
-static void frr_vty_serv(void)
+void frr_vty_serv(void)
 {
 	/* allow explicit override of vty_path in the future
 	 * (not currently set anywhere) */
@@ -814,22 +808,14 @@ static void frr_vty_serv(void)
 	vty_serv_sock(di->vty_addr, di->vty_port, di->vty_path);
 }
 
-static void frr_check_detach(void)
-{
-	if (nodetach_term || nodetach_daemon)
-		return;
-
-	if (daemon_ctl_sock != -1)
-		close(daemon_ctl_sock);
-	daemon_ctl_sock = -1;
-}
-
 static void frr_terminal_close(int isexit)
 {
 	int nullfd;
 
-	nodetach_term = false;
-	frr_check_detach();
+	if (daemon_ctl_sock != -1) {
+		close(daemon_ctl_sock);
+		daemon_ctl_sock = -1;
+	}
 
 	if (!di->daemon_mode || isexit) {
 		printf("\n%s exiting\n", di->name);
@@ -893,12 +879,6 @@ out:
 	return 0;
 }
 
-void frr_detach(void)
-{
-	nodetach_daemon = false;
-	frr_check_detach();
-}
-
 void frr_run(struct thread_master *master)
 {
 	char instanceinfo[64] = "";
@@ -913,8 +893,6 @@ void frr_run(struct thread_master *master)
 		    instanceinfo, di->vty_port, di->startinfo);
 
 	if (di->terminal) {
-		nodetach_term = true;
-
 		vty_stdio(frr_terminal_close);
 		if (daemon_ctl_sock != -1) {
 			set_nonblocking(daemon_ctl_sock);
@@ -934,7 +912,9 @@ void frr_run(struct thread_master *master)
 			close(nullfd);
 		}
 
-		frr_check_detach();
+		if (daemon_ctl_sock != -1)
+			close(daemon_ctl_sock);
+		daemon_ctl_sock = -1;
 	}
 
 	/* end fixed stderr startup logging */

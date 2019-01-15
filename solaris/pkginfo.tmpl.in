@@ -1,4 +1,4 @@
-ARCH="@host_cpu@"
+ARCH="@target_cpu@"
 CATEGORY="system"
 VERSION="@PACKAGE_VERSION@,REV=@CONFDATE@"
 VENDOR="http://www.frrouting.org/"

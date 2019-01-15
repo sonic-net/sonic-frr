@@ -67,17 +67,17 @@ Enabling RPKI
    to configure at least one reachable cache server. See section
    :ref:`configuring-rpki-rtr-cache-servers` for configuring a cache server.
 
-.. index:: RPKI and daemons
+.. index:: RPKI and daemons.conf
 
 When first installing FRR with RPKI support from the pre-packaged binaries.
 Remember to add ``-M rpki`` to the variable ``bgpd_options`` in
-:file:`/etc/frr/daemons` , like so::
+:file:`/etc/frr/daemons.conf` , like so::
 
-   bgpd_options="   -A 127.0.0.1 -M rpki"
+   bgpd_options="   --daemon -A 127.0.0.1 -M rpki"
 
 instead of the default setting::
 
-   bgpd_options="   -A 127.0.0.1"
+   bgpd_options="   --daemon -A 127.0.0.1"
 
 Otherwise you will encounter an error when trying to enter RPKI
 configuration mode due to the ``rpki`` module not being loaded when the BGP

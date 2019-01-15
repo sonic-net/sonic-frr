@@ -57,7 +57,6 @@ pthread_key_t thread_current;
 pthread_mutex_t masters_mtx = PTHREAD_MUTEX_INITIALIZER;
 static struct list *masters;
 
-static void thread_free(struct thread_master *master, struct thread *thread);
 
 /* CLI start ---------------------------------------------------------------- */
 static unsigned int cpu_record_hash_key(struct cpu_thread_history *a)
@@ -538,8 +537,6 @@ static struct thread *thread_trim_head(struct thread_list *list)
 /* Move thread to unuse list. */
 static void thread_add_unuse(struct thread_master *m, struct thread *thread)
 {
-	pthread_mutex_t mtxc = thread->mtx;
-
 	assert(m != NULL && thread != NULL);
 	assert(thread->next == NULL);
 	assert(thread->prev == NULL);
@@ -548,15 +545,10 @@ static void thread_add_unuse(struct thread_master *m, struct thread *thread)
 	memset(thread, 0, sizeof(struct thread));
 	thread->type = THREAD_UNUSED;
 
-	/* Restore the thread mutex context. */
-	thread->mtx = mtxc;
-
-	if (m->unuse.count < THREAD_UNUSED_DEPTH) {
+	if (m->unuse.count < THREAD_UNUSED_DEPTH)
 		thread_list_add(&m->unuse, thread);
-		return;
-	}
-
-	thread_free(m, thread);
+	else
+		XFREE(MTYPE_THREAD, thread);
 }
 
 /* Free all unused thread. */
@@ -567,8 +559,9 @@ static void thread_list_free(struct thread_master *m, struct thread_list *list)
 
 	for (t = list->head; t; t = next) {
 		next = t->next;
-		thread_free(m, t);
+		XFREE(MTYPE_THREAD, t);
 		list->count--;
+		m->alloc--;
 	}
 }
 
@@ -582,7 +575,8 @@ static void thread_array_free(struct thread_master *m,
 		t = thread_array[index];
 		if (t) {
 			thread_array[index] = NULL;
-			thread_free(m, t);
+			XFREE(MTYPE_THREAD, t);
+			m->alloc--;
 		}
 	}
 	XFREE(MTYPE_THREAD_POLL, thread_array);
@@ -593,8 +587,9 @@ static void thread_queue_free(struct thread_master *m, struct pqueue *queue)
 	int i;
 
 	for (i = 0; i < queue->size; i++)
-		thread_free(m, queue->array[i]);
+		XFREE(MTYPE_THREAD, queue->array[i]);
 
+	m->alloc -= queue->size;
 	pqueue_delete(queue);
 }
 
@@ -612,7 +607,8 @@ void thread_master_free_unused(struct thread_master *m)
 	{
 		struct thread *t;
 		while ((t = thread_trim_head(&m->unuse)) != NULL) {
-			thread_free(m, t);
+			pthread_mutex_destroy(&t->mtx);
+			XFREE(MTYPE_THREAD, t);
 		}
 	}
 	pthread_mutex_unlock(&m->mtx);
@@ -729,17 +725,6 @@ static struct thread *thread_get(struct thread_master *m, uint8_t type,
 	thread->schedfrom_line = fromln;
 
 	return thread;
-}
-
-static void thread_free(struct thread_master *master, struct thread *thread)
-{
-	/* Update statistics. */
-	assert(master->alloc > 0);
-	master->alloc--;
-
-	/* Free allocated resources. */
-	pthread_mutex_destroy(&thread->mtx);
-	XFREE(MTYPE_THREAD, thread);
 }
 
 static int fd_poll(struct thread_master *m, struct pollfd *pfds, nfds_t pfdsize,
@@ -1645,27 +1630,25 @@ void funcname_thread_execute(struct thread_master *m,
 			     int (*func)(struct thread *), void *arg, int val,
 			     debugargdef)
 {
-	struct thread *thread;
+	struct cpu_thread_history tmp;
+	struct thread dummy;
 
-	/* Get or allocate new thread to execute. */
-	pthread_mutex_lock(&m->mtx);
-	{
-		thread = thread_get(m, THREAD_EVENT, func, arg, debugargpass);
+	memset(&dummy, 0, sizeof(struct thread));
 
-		/* Set its event value. */
-		pthread_mutex_lock(&thread->mtx);
-		{
-			thread->add_type = THREAD_EXECUTE;
-			thread->u.val = val;
-			thread->ref = &thread;
-		}
-		pthread_mutex_unlock(&thread->mtx);
-	}
-	pthread_mutex_unlock(&m->mtx);
+	pthread_mutex_init(&dummy.mtx, NULL);
+	dummy.type = THREAD_EVENT;
+	dummy.add_type = THREAD_EXECUTE;
+	dummy.master = NULL;
+	dummy.arg = arg;
+	dummy.u.val = val;
 
-	/* Execute thread doing all accounting. */
-	thread_call(thread);
+	tmp.func = dummy.func = func;
+	tmp.funcname = dummy.funcname = funcname;
+	dummy.hist = hash_get(m->cpu_record, &tmp,
+			      (void *(*)(void *))cpu_record_hash_alloc);
 
-	/* Give back or free thread. */
-	thread_add_unuse(m, thread);
+	dummy.schedfrom = schedfrom;
+	dummy.schedfrom_line = fromln;
+
+	thread_call(&dummy);
 }

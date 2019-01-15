@@ -6279,6 +6279,9 @@ int peer_maximum_prefix_set(struct peer *peer, afi_t afi, safi_t safi,
 
 int peer_maximum_prefix_unset(struct peer *peer, afi_t afi, safi_t safi)
 {
+	struct peer *member;
+	struct listnode *node, *nnode;
+
 	/* Inherit configuration from peer-group if peer is member. */
 	if (peer_group_active(peer)) {
 		peer_af_flag_inherit(peer, afi, safi, PEER_FLAG_MAX_PREFIX);
@@ -6302,26 +6305,19 @@ int peer_maximum_prefix_unset(struct peer *peer, afi_t afi, safi_t safi)
 	 * Remove flags and configuration from all peer-group members, unless
 	 * they are explicitely overriding peer-group configuration.
 	 */
-	if (CHECK_FLAG(peer->sflags, PEER_STATUS_GROUP)) {
-		struct peer *member;
-		struct listnode *node;
+	for (ALL_LIST_ELEMENTS(peer->group->peer, node, nnode, member)) {
+		/* Skip peers with overridden configuration. */
+		if (CHECK_FLAG(member->af_flags_override[afi][safi],
+			       PEER_FLAG_MAX_PREFIX))
+			continue;
 
-		for (ALL_LIST_ELEMENTS_RO(peer->group->peer, node, member)) {
-			/* Skip peers with overridden configuration. */
-			if (CHECK_FLAG(member->af_flags_override[afi][safi],
-				       PEER_FLAG_MAX_PREFIX))
-				continue;
-
-			/* Remove flag and configuration on peer-group member.
-			 */
-			UNSET_FLAG(member->af_flags[afi][safi],
-				   PEER_FLAG_MAX_PREFIX);
-			UNSET_FLAG(member->af_flags[afi][safi],
-				   PEER_FLAG_MAX_PREFIX_WARNING);
-			member->pmax[afi][safi] = 0;
-			member->pmax_threshold[afi][safi] = 0;
-			member->pmax_restart[afi][safi] = 0;
-		}
+		/* Remove flag and configuration on peer-group member. */
+		UNSET_FLAG(member->af_flags[afi][safi], PEER_FLAG_MAX_PREFIX);
+		UNSET_FLAG(member->af_flags[afi][safi],
+			   PEER_FLAG_MAX_PREFIX_WARNING);
+		member->pmax[afi][safi] = 0;
+		member->pmax_threshold[afi][safi] = 0;
+		member->pmax_restart[afi][safi] = 0;
 	}
 
 	return 0;
@@ -7478,7 +7474,7 @@ int bgp_config_write(struct vty *vty)
 
 		/* Confederation identifier*/
 		if (CHECK_FLAG(bgp->config, BGP_CONFIG_CONFEDERATION))
-			vty_out(vty, " bgp confederation identifier %u\n",
+			vty_out(vty, " bgp confederation identifier %i\n",
 				bgp->confed_id);
 
 		/* Confederation peer */
@@ -7794,7 +7790,7 @@ void bgp_pthreads_finish()
 	frr_pthread_finish();
 }
 
-void bgp_init(unsigned short instance)
+void bgp_init(void)
 {
 
 	/* allocates some vital data structures used by peer commands in
@@ -7804,7 +7800,7 @@ void bgp_init(unsigned short instance)
 	bgp_pthreads_init();
 
 	/* Init zebra. */
-	bgp_zebra_init(bm->master, instance);
+	bgp_zebra_init(bm->master);
 
 #if ENABLE_BGP_VNC
 	vnc_zebra_init(bm->master);

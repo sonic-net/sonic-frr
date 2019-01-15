@@ -32,7 +32,7 @@ THE SOFTWARE.
 #define CONFIG_NO 1
 #define CONFIG_YES 2
 
-/* babeld interface information */
+/* babeld interface informations */
 struct babel_interface {
     unsigned short flags;                     /* see below */
     unsigned short cost;

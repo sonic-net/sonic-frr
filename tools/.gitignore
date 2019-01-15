@@ -1,6 +1,10 @@
-/frr
+!Makefile
+.arch-inventory
+.arch-ids
+
+*~
+*.loT
+.libs
+*.o
 /permutations
 /ssd
-/watchfrr.sh
-/frrinit.sh
-/frrcommon.sh

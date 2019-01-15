@@ -88,23 +88,7 @@ static int relay_response_back(void)
 			  strerror(errno));
 		return -1;
 	}
-
-	/* do not relay a msg that has nothing to do with LM */
-	switch (resp_cmd) {
-	case ZEBRA_LABEL_MANAGER_CONNECT:
-	case ZEBRA_LABEL_MANAGER_CONNECT_ASYNC: /* should not be seen */
-	case ZEBRA_GET_LABEL_CHUNK:
-	case ZEBRA_RELEASE_LABEL_CHUNK:
-		break;
-	default:
-		zlog_debug("Not relaying '%s' response (size %d) from LM",
-			   zserv_command_string(resp_cmd), size);
-		return -1;
-	}
-
-	zlog_debug("Received '%s' response (size %d) from LM",
-		   zserv_command_string(resp_cmd), size);
-
+	zlog_debug("Label Manager response received, %d bytes", size);
 	if (size == 0)
 		return -1;
 
@@ -155,11 +139,6 @@ static int lm_zclient_read(struct thread *t)
 	/* read response and send it back */
 	ret = relay_response_back();
 
-	/* on error, schedule another read */
-	if (ret == -1)
-		if (!zclient->t_read)
-			thread_add_read(zclient->master, lm_zclient_read, NULL,
-					zclient->sock, &zclient->t_read);
 	return ret;
 }
 
@@ -248,9 +227,8 @@ int zread_relay_label_manager_request(int cmd, struct zserv *zserv,
 	zserv->proto = proto;
 
 	/* in case there's any incoming message enqueued, read and forward it */
-	if (zserv->is_synchronous)
-		while (ret == 0)
-			ret = relay_response_back();
+	while (ret == 0)
+		ret = relay_response_back();
 
 	/* get the msg buffer used toward the 'master' Label Manager */
 	dst = zclient->obuf;

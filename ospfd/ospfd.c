@@ -171,7 +171,7 @@ void ospf_router_id_update(struct ospf *ospf)
 
 		/* Flush (inline) all external LSAs which now match the new
 		   router-id,
-		   need to adjust the OSPF_LSA_SELF flag, so the flush doesn't
+		   need to adjust the OSPF_LSA_SELF flag, so the flush doesnt
 		   hit
 		   asserts in ospf_refresher_unregister_lsa(). This step is
 		   needed
@@ -895,7 +895,6 @@ void ospf_area_check_free(struct ospf *ospf, struct in_addr area_id)
 
 	area = ospf_area_lookup_by_area_id(ospf, area_id);
 	if (area && listcount(area->oiflist) == 0 && area->ranges->top == NULL
-	    && !ospf_vl_count(ospf, area)
 	    && area->shortcut_configured == OSPF_SHORTCUT_DEFAULT
 	    && area->external_routing == OSPF_AREA_DEFAULT
 	    && area->no_summary == 0 && area->default_cost == 1

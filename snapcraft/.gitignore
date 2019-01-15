@@ -3,3 +3,4 @@ parts
 prime
 stage
 frr*.snap
+!*/Makefile

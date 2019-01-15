@@ -311,7 +311,6 @@ frr version @PACKAGE_VERSION@
 frr defaults @DFLT_NAME@
 !
 hostname test
-domainname test.domain
 !
 !
 line vty
@@ -327,7 +326,6 @@ frr version @PACKAGE_VERSION@
 frr defaults @DFLT_NAME@
 !
 hostname foohost
-domainname test.domain
 !
 !
 line vty

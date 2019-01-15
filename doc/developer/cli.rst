@@ -450,6 +450,8 @@ is no ordering requirement)
 
 .. code-block:: make
 
+   include ../common.am
+
    # ...
 
    # if linked into a LTLIBRARY (.la/.so):
