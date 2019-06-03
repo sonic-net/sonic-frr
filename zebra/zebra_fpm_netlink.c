@@ -327,7 +327,12 @@ static int netlink_route_info_encode(netlink_route_info_t *ri, char *in_buf,
 	req->n.nlmsg_flags = NLM_F_CREATE | NLM_F_REQUEST;
 	req->n.nlmsg_type = ri->nlmsg_type;
 	req->r.rtm_family = ri->af;
-	req->r.rtm_table = ri->rtm_table;
+	if (ri->rtm_table < 256)
+		req->r.rtm_table = ri->rtm_table;
+	else {
+		req->r.rtm_table = RT_TABLE_COMPAT;
+		addattr32(&req->n, in_buf_len, RTA_TABLE, ri->rtm_table);
+	}
 	req->r.rtm_dst_len = ri->prefix->prefixlen;
 	req->r.rtm_protocol = ri->rtm_protocol;
 	req->r.rtm_scope = RT_SCOPE_UNIVERSE;
