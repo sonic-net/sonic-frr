@@ -2143,7 +2143,7 @@ DEFUN (no_access_list_any,
        "Specify packets to forward\n"
        "Prefix to match. e.g. 10.0.0.0/8\n")
 {
-	int idx_word = 1;
+	int idx_word = 2;
 	int idx = 0;
 	char *seq = NULL;
 	char *permit_deny = NULL;
