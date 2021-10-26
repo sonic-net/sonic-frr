@@ -559,9 +559,10 @@ int main(int argc, char **argv, char **env)
 	}
 
 	if (inputfile) {
-		vtysh_flock_config(inputfile);
+		int is_real_file = ( strcmp(inputfile, "-") )  ;
+		if (  is_real_file ) vtysh_flock_config(inputfile);
 		ret = vtysh_read_config(inputfile);
-		vtysh_unflock_config();
+		if ( is_real_file ) vtysh_unflock_config();
 		exit(ret);
 	}
 

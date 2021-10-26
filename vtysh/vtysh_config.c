@@ -513,13 +513,13 @@ void vtysh_config_dump(void)
 }
 
 /* Read up configuration file from file_name. */
-static int vtysh_read_file(FILE *confp)
+static int vtysh_read_file(FILE *confp, int output_fileno)
 {
 	struct vty *vty;
 	int ret;
 
 	vty = vty_new();
-	vty->wfd = STDERR_FILENO;
+	vty->wfd = output_fileno;
 	vty->type = VTY_TERM;
 	vty->node = CONFIG_NODE;
 
@@ -543,7 +543,13 @@ int vtysh_read_config(const char *config_default_dir)
 	FILE *confp = NULL;
 	int ret;
 
-	confp = fopen(config_default_dir, "r");
+	int is_real_file = strcmp(config_default_dir,"-") ;
+	if ( is_real_file == 0 ) {
+		confp = stdin ;
+	}
+	else {
+		confp = fopen(config_default_dir, "r");
+	}
 	if (confp == NULL) {
 		fprintf(stderr,
 			"%% Can't open configuration file %s due to '%s'.\n",
@@ -551,8 +557,8 @@ int vtysh_read_config(const char *config_default_dir)
 		return CMD_ERR_NO_FILE;
 	}
 
-	ret = vtysh_read_file(confp);
-	fclose(confp);
+	ret = vtysh_read_file(confp, is_real_file ? STDERR_FILENO : STDOUT_FILENO );
+	if ( is_real_file ) fclose(confp);
 
 	return (ret);
 }
