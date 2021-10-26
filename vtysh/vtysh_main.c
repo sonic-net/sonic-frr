@@ -294,6 +294,41 @@ void suid_off(void)
 	}
 }
 
+struct cmd_rec {
+	char *line;
+	struct cmd_rec *next;
+} ;
+
+enum {
+	k_MaxLine = 1024 /* Max line length for reading from file */
+} ;
+static char *read_line_from_file(FILE *fp)
+{
+	char *line = XMALLOC(MTYPE_TMP,k_MaxLine) ; /* Note: 'line' is leaked */
+    char * a = fgets(line,k_MaxLine,fp) ;
+    if ( a == NULL ) return NULL ;
+	size_t linesize=strlen(line) ;
+	if ( linesize == 0 ) return line ;
+	if ( line[linesize-1] == '\n') line[linesize-1] = 0 ;
+	return line ;
+}
+
+static void read_commands_from_file(struct cmd_rec ** cmd, FILE *fp)
+{
+    struct cmd_rec *tail ;
+    *cmd = XMALLOC(MTYPE_TMP, sizeof(struct cmd_rec));
+    *cmd->line = read_line_from_file(fp) ;
+    *cmd->next = NULL ;
+    tail=&(*cmd->next) ;
+    while ( !feof(fp)) {
+		struct cmd_rec *cr;
+		cr = XMALLOC(MTYPE_TMP, sizeof(struct cmd_rec));
+		cr->line = read_line_from_file(fp) ;
+		tail->next = cr;
+		tail = cr;
+    }
+}
+
 /* VTY shell main routine. */
 int main(int argc, char **argv, char **env)
 {
@@ -303,10 +338,7 @@ int main(int argc, char **argv, char **env)
 	int boot_flag = 0;
 	const char *daemon_name = NULL;
 	const char *inputfile = NULL;
-	struct cmd_rec {
-		char *line;
-		struct cmd_rec *next;
-	} *cmd = NULL;
+	struct cmd_rec *cmd = NULL;
 	struct cmd_rec *tail = NULL;
 	int echo_command = 0;
 	int no_error = 0;
@@ -408,6 +440,11 @@ int main(int argc, char **argv, char **env)
 			usage(1);
 			break;
 		}
+	}
+
+	if ( cmd == NULL && ! isatty(0))
+	{
+		read_commands_from_file(&cmd, stdin) ;
 	}
 
 	if (ditch_suid) {
