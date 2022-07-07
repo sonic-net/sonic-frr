@@ -202,6 +202,9 @@ void resolver_resolve(struct resolver_query *query, int af,
 {
 	int ret;
 
+	if (hostname == NULL)
+		return;
+
 	if (query->callback != NULL) {
 		flog_err(
 			EC_LIB_RESOLVER,
