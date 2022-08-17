@@ -1813,7 +1813,7 @@ struct aspath *aspath_delete_confed_seq(struct aspath *aspath)
 			/* This is the first segment in the aspath */
 			if (aspath->segments == seg)
 				aspath->segments = seg->next;
-			else
+			else if (prev)
 				prev->next = seg->next;
 
 			assegment_free(seg);
