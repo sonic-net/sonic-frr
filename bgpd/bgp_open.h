@@ -24,7 +24,7 @@
 /* Standard header for capability TLV */
 struct capability_header {
 	uint8_t code;
-	uint8_t length;
+	uint8_t length; /* Note, extra one more oct in dynamic capabilities */
 };
 
 /* Generic MP capability data */
@@ -35,9 +35,14 @@ struct capability_mp_data {
 };
 
 struct graceful_restart_af {
-	afi_t afi;
-	safi_t safi;
+	uint16_t afi;
+	uint8_t safi;
 	uint8_t flag;
+};
+
+struct capability_gr {
+	uint16_t restart_flag_time;
+	struct graceful_restart_af gr[];
 };
 
 /* Capability Code */

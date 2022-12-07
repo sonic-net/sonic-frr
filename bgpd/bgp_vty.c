@@ -1946,6 +1946,23 @@ DEFUN (no_bgp_deterministic_med,
 	return CMD_SUCCESS;
 }
 
+static void bgp_restart_dyn_capability_update (struct bgp *bgp, int set)
+{
+	struct peer *peer;
+	struct listnode *node, *nnode;
+
+	for (ALL_LIST_ELEMENTS(bgp->peer, node, nnode, peer)) {
+		if ((peer->status == Established) &&
+		    (CHECK_FLAG(peer->cap, PEER_CAP_DYNAMIC_RCV))) {
+			bgp_capability_send(peer, AFI_MAX, SAFI_MAX,
+					    CAPABILITY_CODE_RESTART,
+					    set ?
+					    CAPABILITY_ACTION_SET :
+					    CAPABILITY_ACTION_UNSET);
+		}
+	}
+}
+
 /* "bgp graceful-restart" configuration. */
 DEFUN (bgp_graceful_restart,
        bgp_graceful_restart_cmd,
@@ -1954,7 +1971,10 @@ DEFUN (bgp_graceful_restart,
        "Graceful restart capability parameters\n")
 {
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
-	bgp_flag_set(bgp, BGP_FLAG_GRACEFUL_RESTART);
+	if (!bgp_flag_check(bgp, BGP_FLAG_GRACEFUL_RESTART)) {
+		bgp_flag_set(bgp, BGP_FLAG_GRACEFUL_RESTART);
+		bgp_restart_dyn_capability_update(bgp, 1);
+	}
 	return CMD_SUCCESS;
 }
 
@@ -1966,7 +1986,10 @@ DEFUN (no_bgp_graceful_restart,
        "Graceful restart capability parameters\n")
 {
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
-	bgp_flag_unset(bgp, BGP_FLAG_GRACEFUL_RESTART);
+	if (bgp_flag_check(bgp, BGP_FLAG_GRACEFUL_RESTART)) {
+		bgp_flag_unset(bgp, BGP_FLAG_GRACEFUL_RESTART);
+		bgp_restart_dyn_capability_update(bgp, 0);
+	}
 	return CMD_SUCCESS;
 }
 
@@ -2001,6 +2024,9 @@ DEFUN (bgp_graceful_restart_restart_time,
 
 	restart = strtoul(argv[idx_number]->arg, NULL, 10);
 	bgp->restart_time = restart;
+	if (bgp_flag_check(bgp, BGP_FLAG_GRACEFUL_RESTART)) {
+		bgp_restart_dyn_capability_update(bgp, 1);
+	}
 	return CMD_SUCCESS;
 }
 
@@ -2031,6 +2057,9 @@ DEFUN (no_bgp_graceful_restart_restart_time,
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
 
 	bgp->restart_time = BGP_DEFAULT_RESTART_TIME;
+	if (bgp_flag_check(bgp, BGP_FLAG_GRACEFUL_RESTART)) {
+		bgp_restart_dyn_capability_update(bgp, 1);
+	}
 	return CMD_SUCCESS;
 }
 
@@ -2042,7 +2071,12 @@ DEFUN (bgp_graceful_restart_preserve_fw,
        "Sets F-bit indication that fib is preserved while doing Graceful Restart\n")
 {
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
-	bgp_flag_set(bgp, BGP_FLAG_GR_PRESERVE_FWD);
+	if (!bgp_flag_check(bgp, BGP_FLAG_GR_PRESERVE_FWD)) {
+		bgp_flag_set(bgp, BGP_FLAG_GR_PRESERVE_FWD);
+		if (bgp_flag_check(bgp, BGP_FLAG_GRACEFUL_RESTART)) {
+			bgp_restart_dyn_capability_update(bgp, 1);
+		}
+	}
 	return CMD_SUCCESS;
 }
 
@@ -2055,7 +2089,12 @@ DEFUN (no_bgp_graceful_restart_preserve_fw,
        "Unsets F-bit indication that fib is preserved while doing Graceful Restart\n")
 {
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
-	bgp_flag_unset(bgp, BGP_FLAG_GR_PRESERVE_FWD);
+	if (bgp_flag_check(bgp, BGP_FLAG_GR_PRESERVE_FWD)) {
+		bgp_flag_unset(bgp, BGP_FLAG_GR_PRESERVE_FWD);
+		if (bgp_flag_check(bgp, BGP_FLAG_GRACEFUL_RESTART)) {
+			bgp_restart_dyn_capability_update(bgp, 1);
+		}
+	}
 	return CMD_SUCCESS;
 }
 

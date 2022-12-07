@@ -863,6 +863,65 @@ void bgp_route_refresh_send(struct peer *peer, afi_t afi, safi_t safi,
 	bgp_writes_on(peer);
 }
 
+static void bgp_restart_dyn_capability_send (struct peer *peer,
+					     int action,
+					     struct stream *s)
+{
+	afi_t afi;
+	safi_t safi;
+	iana_afi_t pkt_afi;
+	iana_safi_t pkt_safi;
+	uint8_t len;
+	unsigned long rcapp;
+	uint32_t restart_time;
+
+	stream_putc(s, action);
+	stream_putc(s, CAPABILITY_CODE_RESTART);
+
+	/* Copy from optional capability */
+	rcapp = stream_get_endp(s); /* Set Restart Capability Len Pointer */
+	stream_putc(s, 0);
+	restart_time = peer->bgp->restart_time;
+	if (peer->bgp->t_startup) {
+		SET_FLAG(restart_time, RESTART_R_BIT);
+		SET_FLAG(peer->cap, PEER_CAP_RESTART_BIT_ADV);
+	}
+	stream_putw(s, restart_time);
+
+	FOREACH_AFI_SAFI (afi, safi) {
+		if (peer->afc[afi][safi]) {
+			/* Convert AFI, SAFI to values for
+			 * packet. */
+			bgp_map_afi_safi_int2iana(afi, safi, &pkt_afi,
+						  &pkt_safi);
+			stream_putw(s, pkt_afi);
+			stream_putc(s, pkt_safi);
+			if (bgp_flag_check(peer->bgp,
+					   BGP_FLAG_GR_PRESERVE_FWD)) {
+				stream_putc(s, RESTART_F_BIT);
+			} else {
+				stream_putc(s, 0);
+			}
+
+			if (bgp_debug_neighbor_events(peer))
+				zlog_debug(
+					   "%s sending CAPABILITY has %s Graceful Restart CAP for afi/safi: %d/%d "
+					   "is%spreserved",
+					   peer->host,
+					   action == CAPABILITY_ACTION_SET ? "Advertising"
+					   : "Removing",
+					   pkt_afi, pkt_safi,
+					   bgp_flag_check(peer->bgp,
+							  BGP_FLAG_GR_PRESERVE_FWD) ?
+					   " " : "not");
+		}
+	}
+
+	/* Total Graceful restart capability Len. */
+	len = stream_get_endp(s) - rcapp - 1;
+	stream_putc_at(s, rcapp, len);
+}
+
 /*
  * Create a BGP Capability packet and append it to the peer's output queue.
  *
@@ -903,6 +962,8 @@ void bgp_capability_send(struct peer *peer, afi_t afi, safi_t safi,
 				action == CAPABILITY_ACTION_SET ? "Advertising"
 								: "Removing",
 				pkt_afi, pkt_safi);
+	} else if (capability_code == CAPABILITY_CODE_RESTART) {
+		bgp_restart_dyn_capability_send(peer, action, s);
 	}
 
 	/* Set packet size. */
@@ -2001,6 +2062,115 @@ static int bgp_route_refresh_receive(struct peer *peer, bgp_size_t size)
 	return BGP_PACKET_NOOP;
 }
 
+static int bgp_restart_dyn_capability_parse (struct peer *peer,
+					     u_char action,
+					     struct capability_header *caphdr,
+					     u_char *end)
+{
+	u_int16_t pkt_time, restart_flag_time;
+	u_char *pnt;
+
+	/* Verify length is a multiple of 4 */
+	if ((caphdr->length - 2) % 4) {
+		zlog_warn(
+			"Restart Cap: Received invalid length %d, non-multiple of 4",
+			caphdr->length);
+		return -1;
+	}
+
+	SET_FLAG(peer->cap, PEER_CAP_RESTART_RCV);
+	pnt = (u_char *)caphdr;
+	pnt += sizeof(struct capability_header); /* Adjust it to value of restart capability */
+
+	memcpy(&pkt_time, pnt, sizeof(u_int16_t));
+	restart_flag_time = ntohs(pkt_time);
+	pnt += sizeof(u_int16_t);
+
+	if (CHECK_FLAG(restart_flag_time, RESTART_R_BIT))
+		SET_FLAG(peer->cap, PEER_CAP_RESTART_BIT_RCV);
+
+	UNSET_FLAG(restart_flag_time, 0xF000);
+	peer->v_gr_restart = restart_flag_time;
+
+	if (bgp_debug_neighbor_events(peer)) {
+		zlog_debug("%s Capability has Graceful Restart capability",
+			   peer->host);
+		zlog_debug("%s Peer has%srestarted. Restart Time : %d",
+			   peer->host,
+			   CHECK_FLAG(peer->cap, PEER_CAP_RESTART_BIT_RCV)
+				   ? " "
+				   : " not ",
+			   peer->v_gr_restart);
+	}
+
+
+	while (pnt + 4 <= end) {
+		struct graceful_restart_af grc;
+		iana_afi_t pkt_afi;
+		iana_safi_t pkt_safi;
+		uint8_t flag;
+		afi_t afi;
+		safi_t safi;
+
+		memcpy(&grc, pnt, sizeof(struct graceful_restart_af));
+		pnt += sizeof(struct graceful_restart_af);
+		pkt_afi = ntohs(grc.afi);
+		pkt_safi = grc.safi;
+		flag = grc.flag;
+
+		/* Convert AFI, SAFI to internal values, check. */
+		if (bgp_map_afi_safi_iana2int(pkt_afi, pkt_safi, &afi, &safi)) {
+			if (bgp_debug_neighbor_events(peer))
+				zlog_debug(
+					"%s Addr-family %d/%d(afi/safi) not supported."
+					" Ignore the Graceful Restart capability for this AFI/SAFI",
+					peer->host, pkt_afi, pkt_safi);
+		} else if (!peer->afc[afi][safi]) {
+			if (bgp_debug_neighbor_events(peer))
+				zlog_debug(
+					"%s Addr-family %d/%d(afi/safi) not enabled."
+					" Ignore the Graceful Restart capability",
+					peer->host, pkt_afi, pkt_safi);
+		} else {
+			if (bgp_debug_neighbor_events(peer))
+				zlog_debug(
+					   "%s Address family %s was%spreserved",
+					   peer->host, afi_safi_print(afi, safi),
+					   CHECK_FLAG(peer->af_cap[afi][safi],
+						      PEER_CAP_RESTART_AF_PRESERVE_RCV) ?
+					   " " : " not ");
+
+			if (action == CAPABILITY_ACTION_SET) {
+				SET_FLAG(peer->af_cap[afi][safi],
+					 PEER_CAP_RESTART_AF_RCV);
+				if (CHECK_FLAG(flag, RESTART_F_BIT)) {
+					SET_FLAG(peer->af_cap[afi][safi],
+						 PEER_CAP_RESTART_AF_PRESERVE_RCV);
+				} else {
+					UNSET_FLAG(peer->af_cap[afi][safi],
+						   PEER_CAP_RESTART_AF_PRESERVE_RCV);
+				}
+			} else { /*
+				  * Reset AF specifict bit if removing
+				  * graceful-restart capability dynamically
+				  */
+				UNSET_FLAG(peer->af_cap[afi][safi],
+					 PEER_CAP_RESTART_AF_RCV);
+				UNSET_FLAG(peer->af_cap[afi][safi],
+					 PEER_CAP_RESTART_AF_PRESERVE_RCV);
+			}
+			if (bgp_debug_neighbor_events(peer))
+				zlog_debug(
+					   "%s Address family %s now is%spreserved",
+					   peer->host, afi_safi_print(afi, safi),
+					   CHECK_FLAG(peer->af_cap[afi][safi],
+						      PEER_CAP_RESTART_AF_PRESERVE_RCV) ?
+					   " " : " not ");
+		}
+	}
+	return 0;
+}
+
 /**
  * Parse BGP CAPABILITY message for peer.
  *
@@ -2011,7 +2181,7 @@ static int bgp_route_refresh_receive(struct peer *peer, bgp_size_t size)
 static int bgp_capability_msg_parse(struct peer *peer, uint8_t *pnt,
 				    bgp_size_t length)
 {
-	uint8_t *end;
+	uint8_t *end, *start_val;
 	struct capability_mp_data mpc;
 	struct capability_header *hdr;
 	uint8_t action;
@@ -2054,12 +2224,13 @@ static int bgp_capability_msg_parse(struct peer *peer, uint8_t *pnt,
 			return BGP_Stop;
 		}
 
-		/* Fetch structure to the byte stream. */
-		memcpy(&mpc, pnt + 3, sizeof(struct capability_mp_data));
-		pnt += hdr->length + 3;
+	        start_val = pnt + 3; /* Get start of value */
+		pnt = start_val + hdr->length; /* Move to next dynamic cap */
 
 		/* We know MP Capability Code. */
 		if (hdr->code == CAPABILITY_CODE_MP) {
+			/* Fetch structure to the byte stream. */
+			memcpy(&mpc, start_val, sizeof(struct capability_mp_data));
 			pkt_afi = ntohs(mpc.afi);
 			pkt_safi = mpc.safi;
 
@@ -2103,6 +2274,18 @@ static int bgp_capability_msg_parse(struct peer *peer, uint8_t *pnt,
 					bgp_clear_route(peer, afi, safi);
 				else
 					return BGP_Stop;
+			}
+		} else if (hdr->code == CAPABILITY_CODE_RESTART) {
+			if (bgp_debug_neighbor_events(peer))
+				zlog_debug(
+					   "%s CAPABILITY has %s RESTART CAP",
+					   peer->host,
+					   action == CAPABILITY_ACTION_SET
+					   ? "Advertising"
+					   : "Removing");
+
+			if (bgp_restart_dyn_capability_parse(peer, action, hdr, end) < 0) {
+				return BGP_Stop;
 			}
 		} else {
 			flog_warn(
