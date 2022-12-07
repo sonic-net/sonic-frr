@@ -475,7 +475,14 @@ int if_is_loopback(const struct interface *ifp)
 	/* XXX: Do this better, eg what if IFF_WHATEVER means X on platform M
 	 * but Y on platform N?
 	 */
-	return (ifp->flags & (IFF_LOOPBACK | IFF_NOXMIT | IFF_VIRTUAL));
+#define INSPUR_LO_STR "Loopback"
+    bool is_lo = false;
+    if (strlen(INSPUR_LO_STR) <= strlen(ifp->name)) {
+		if (!strncmp(INSPUR_LO_STR, ifp->name, strlen(INSPUR_LO_STR)))
+		is_lo = true;
+		}
+	
+	return is_lo | (ifp->flags & (IFF_LOOPBACK | IFF_NOXMIT | IFF_VIRTUAL));
 }
 
 /* Check interface is VRF */
