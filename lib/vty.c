@@ -2845,6 +2845,8 @@ bool vty_read_config(struct nb_config *config, const char *config_file,
 {
 	FILE *confp;
 
+    zlog_err("vty_read_config: frr_debug_sonic: config file: %s, config_default_dir %s ",
+          config_file, config_default_dir);
 	confp = vty_open_config(config_file, config_default_dir);
 	if (!confp)
 		return false;
