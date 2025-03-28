@@ -14,6 +14,7 @@
 #include "northbound.h"
 
 #include "lib/config_paths.h"
+#include "zlog.h"
 
 DEFINE_MTYPE_STATIC(LIB, YANG_MODULE, "YANG module");
 DEFINE_MTYPE_STATIC(LIB, YANG_DATA, "YANG data structure");
@@ -1342,4 +1343,25 @@ const char *yang_ly_strvecode(LY_VECODE vecode)
 		return "unknown";
 	}
 #endif
+}
+
+void debug_lyd_free_tree(struct lyd_node *dnode)
+{
+
+    zlog_err("%s: ERROR: frr_debug_sonic_free: dnode %p",  __func__, dnode);
+#undef lyd_free_tree
+    lyd_free_tree(dnode);
+}
+
+static pthread_mutex_t candidate_edit_lock = PTHREAD_MUTEX_INITIALIZER;
+LY_ERR debug_lyd_new_path(struct lyd_node *parent, const struct ly_ctx
+        *ctx, const char *path, const char *value,
+        uint32_t options, struct lyd_node **node)
+{
+	LY_ERR err;
+    pthread_mutex_lock(&candidate_edit_lock);
+#undef lyd_new_path
+	err = lyd_new_path(parent, ctx, path, value, options, node);
+    pthread_mutex_unlock(&candidate_edit_lock);
+    return err;
 }

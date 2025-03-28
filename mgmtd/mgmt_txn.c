@@ -16,6 +16,7 @@
 #include "mgmtd/mgmt.h"
 #include "mgmtd/mgmt_memory.h"
 #include "mgmtd/mgmt_txn.h"
+#include "libyang/libyang.h"
 
 #define __dbg(fmt, ...)                                                        \
 	DEBUGD(&mgmt_debug_txn, "TXN: %s: " fmt, __func__, ##__VA_ARGS__)
@@ -945,10 +946,112 @@ static int mgmt_txn_create_config_batches(struct mgmt_txn_req *txn_req,
 	return 0;
 }
 
+
+static void mgmt_print_nb_config_cbs(const char *prefix, struct nb_config_cbs *cfg_chgs)
+{
+    struct nb_config_cb *cb, *nxt;
+    struct nb_config_change *chg;
+    char *xpath;
+
+    if (!cfg_chgs) {
+        __dbg("%s: nb_config_cbs is NULL", prefix);
+        return;
+    }
+
+    __dbg("%s: nb_config_cbs structure: %p", prefix, cfg_chgs);
+
+    if (RB_EMPTY(nb_config_cbs, cfg_chgs)) {
+        __dbg("%s: nb_config_cbs is empty", prefix);
+        return;
+    }
+
+    RB_FOREACH_SAFE (cb, nb_config_cbs, cfg_chgs, nxt) {
+        chg = (struct nb_config_change *)cb;
+        
+        __dbg("%s: Change operation: %d", prefix, chg->cb.operation);
+        __dbg("%s: Change nb_node: %p", prefix, chg->cb.nb_node);
+        if (chg->cb.nb_node) {
+            __dbg("%s: Change nb_node schema: %s", prefix, chg->cb.nb_node->snode->name);
+            __dbg("%s: Change nb_node module: %s", prefix, chg->cb.nb_node->snode->module->name);
+        }
+
+        __dbg("%s: Change dnode: %p", prefix, chg->cb.dnode);
+        if (chg->cb.dnode) {
+            __dbg("%s: Change dnode schema: %s", prefix, chg->cb.dnode->schema->name);
+            __dbg("%s: Change dnode module: %s", prefix, chg->cb.dnode->schema->module->name);
+            __dbg("%s: Change dnode type: %d", prefix, chg->cb.dnode->schema->nodetype);
+
+            xpath = lyd_path(chg->cb.dnode, LYD_PATH_STD, NULL, 0);
+            if (xpath) {
+                __dbg("%s: Change dnode xpath: %s", prefix, xpath);
+                if (chg->cb.dnode->schema->nodetype & LYD_NODE_TERM) {
+                    const char *value = lyd_get_value(chg->cb.dnode);
+                    __dbg("%s: Change dnode value: %s", prefix, value ? value : "NULL");
+                }
+                free(xpath);
+            }
+        }
+    }
+}
+
+static void mgmt_print_nb_config(const char *prefix, struct nb_config *nb_config)
+{
+    struct lyd_node *dnode;
+	struct lyd_node *root, *child;
+    const char *value;
+    char *xpath;
+
+    if (!nb_config) {
+        __dbg("%s: nb_config is NULL", prefix);
+        return;
+    }
+
+    __dbg("%s: nb_config structure: %p", prefix, nb_config);
+    __dbg("%s: nb_config dnode: %p", prefix, nb_config->dnode);
+
+    if (!nb_config->dnode) {
+        __dbg("%s: nb_config dnode is NULL", prefix);
+        return;
+    }
+
+    __dbg("%s: nb_config dnode schema: %s", prefix, nb_config->dnode->schema->name);
+    __dbg("%s: nb_config dnode module: %s", prefix, nb_config->dnode->schema->module->name);
+    __dbg("%s: nb_config dnode type: %d", prefix, nb_config->dnode->schema->nodetype);
+
+    /* Print the root node */
+    xpath = lyd_path(nb_config->dnode, LYD_PATH_STD, NULL, 0);
+    if (xpath) {
+        __dbg("%s: Root node xpath: %s", prefix, xpath);
+        free(xpath);
+    }
+
+    /* Print all child nodes */
+	LY_LIST_FOR (nb_config->dnode, root) {
+		LYD_TREE_DFS_BEGIN (root, child) {
+            xpath = lyd_path(child, LYD_PATH_STD, NULL, 0);
+            if (xpath) {
+                __dbg("%s: Child node %p xpath: %s", prefix, child, xpath);
+                //__dbg("%s: Child node schema: %s", prefix, child->schema->name);
+                //__dbg("%s: Child node module: %s", prefix, child->schema->module->name);
+                //__dbg("%s: Child node type: %d", prefix, child->schema->nodetype);
+
+                if (child->schema->nodetype & LYD_NODE_TERM) {
+                    value = lyd_get_value(child);
+                    __dbg("%s: Child node value: %s", prefix, value ? value : "NULL");
+                }
+
+                free(xpath);
+            }
+			LYD_TREE_DFS_END(root, child);
+        }
+    }
+}
+
+extern struct lyd_node *rm_set_src_node;
 static int mgmt_txn_prepare_config(struct mgmt_txn_ctx *txn)
 {
 	struct nb_context nb_ctx;
-	struct nb_config *nb_config;
+    struct nb_config *nb_config, *dst_nb_config;
 	struct nb_config_cbs changes;
 	struct nb_config_cbs *cfg_chgs = NULL;
 	int ret;
@@ -1013,6 +1116,17 @@ static int mgmt_txn_prepare_config(struct mgmt_txn_ctx *txn)
 		goto mgmt_txn_prepare_config_done;
 	}
 
+    if (rm_set_src_node) {
+        char *xpath = lyd_path(rm_set_src_node, LYD_PATH_STD, NULL, 0);
+        __dbg("frr_debug_sonic: dnode %p, xpath %s", rm_set_src_node, xpath);
+        __dbg("frr_debug_sonic: node schema: %s", rm_set_src_node->schema->name);
+        __dbg("frr_debug_sonic: node module: %s", rm_set_src_node->schema->module->name);
+        free(xpath);
+    }
+    else {
+        __dbg("frr_debug_sonic: rm_set_src_node is NULL");
+    }
+    mgmt_print_nb_config("frr_debug_sonic: SET_CFG src", nb_config);
 	/*
 	 * Validate YANG contents of the source DS and get the diff
 	 * between source and destination DS contents.
@@ -1029,6 +1143,9 @@ static int mgmt_txn_prepare_config(struct mgmt_txn_ctx *txn)
 		ret = -1;
 		goto mgmt_txn_prepare_config_done;
 	}
+       dst_nb_config = mgmt_ds_get_nb_config(
+               txn->commit_cfg_req->req.commit_cfg.dst_ds_ctx);
+       mgmt_print_nb_config("frr_debug_sonic: SET_CFG dst", dst_nb_config);
 
 	nb_config_diff(mgmt_ds_get_nb_config(txn->commit_cfg_req->req.commit_cfg
 					     .dst_ds_ctx),
@@ -1036,6 +1153,7 @@ static int mgmt_txn_prepare_config(struct mgmt_txn_ctx *txn)
 	cfg_chgs = &changes;
 	del_cfg_chgs = true;
 
+     mgmt_print_nb_config_cbs("frr_debug_sonic: CONFIG_CHANGES", cfg_chgs);
 	if (RB_EMPTY(nb_config_cbs, cfg_chgs)) {
 		/*
 		 * This means there's no changes to commit whatsoever

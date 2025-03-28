@@ -4,6 +4,9 @@
  *                     Renato Westphal
  */
 
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/mman.h>
 #include <zebra.h>
 
 #include "darr.h"
@@ -683,6 +686,10 @@ void nb_config_diff(const struct nb_config *config1,
 	lyd_free_all(diff);
 }
 
+#define __dbg(fmt, ...) \
+    zlog_err("%s: ERROR: " fmt, __func__, ##__VA_ARGS__)
+
+struct lyd_node *rm_set_src_node;
 static int dnode_create(struct nb_config *candidate, const char *xpath,
 			const char *value, uint32_t options,
 			struct lyd_node **new_dnode)
@@ -692,6 +699,17 @@ static int dnode_create(struct nb_config *candidate, const char *xpath,
 
 	err = lyd_new_path(candidate->dnode, ly_native_ctx, xpath, value,
 			   options, &dnode);
+    if (dnode) {
+        __dbg("frr_debug_sonic_create: dnode %p, xpath %s, value %s", dnode, xpath, value);
+        char *xpath = lyd_path(dnode, LYD_PATH_STD, NULL, 0);
+        if (xpath &&
+            !strcmp("/frr-route-map:lib/route-map[name='RM_SET_SRC']/entry[sequence='10']/set-action[action='frr-zebra-route-map:src-address']/rmap-set-action/frr-zebra-route-map:ipv4-src-address", xpath)) {
+            mprotect(dnode->schema, sizeof(dnode->schema), PROT_READ);
+            rm_set_src_node = dnode;
+            free(xpath);
+        }
+    }
+
 	if (err) {
 		flog_warn(EC_LIB_LIBYANG, "%s: lyd_new_path(%s) failed: %d",
 			  __func__, xpath, err);
@@ -858,6 +876,7 @@ void nb_candidate_edit_config_changes(struct nb_config *candidate_config,
 	if (xpath_base == NULL)
 		xpath_base = "";
 
+    __dbg("frr_debug_sonic: num_cfg_changes: '%u'", num_cfg_changes);
 	/* Edit candidate configuration. */
 	for (size_t i = 0; i < num_cfg_changes; i++) {
 		struct nb_cfg_change *change = &cfg_changes[i];
@@ -875,6 +894,7 @@ void nb_candidate_edit_config_changes(struct nb_config *candidate_config,
 			change_xpath++; /* skip '.' */
 		}
 		strlcat(xpath, change_xpath, sizeof(xpath));
+		__dbg("frr_debug_sonic: XPath: '%s'", xpath);
 
 		/* Find the northbound node associated to the data path. */
 		nb_node = nb_node_find(xpath);
@@ -890,6 +910,7 @@ void nb_candidate_edit_config_changes(struct nb_config *candidate_config,
 				if (error)
 					*error = true;
 			}
+            __dbg("frr_debug_sonic: XPath: '%s', nb_node NULL", xpath);
 			continue;
 		}
 		/* Find if the node to be edited is not a key node */
@@ -897,6 +918,7 @@ void nb_candidate_edit_config_changes(struct nb_config *candidate_config,
 			zlog_err(" Xpath %s points to key node", xpath);
 			if (error)
 				*error = true;
+            __dbg("frr_debug_sonic: XPath: '%s', nb_is_operation_allowed NULL", xpath);
 			break;
 		}
 
@@ -910,6 +932,8 @@ void nb_candidate_edit_config_changes(struct nb_config *candidate_config,
 		 * Ignore "not found" errors when editing the candidate
 		 * configuration.
 		 */
+        __dbg("frr_debug_sonic: XPath: '%s', value '%s', operation %u", xpath,
+                value, change->operation);
 		ret = nb_candidate_edit(candidate_config, nb_node,
 					change->operation, xpath, NULL, data);
 		yang_data_free(data);
@@ -921,6 +945,7 @@ void nb_candidate_edit_config_changes(struct nb_config *candidate_config,
 				xpath);
 			if (error)
 				*error = true;
+            __dbg("frr_debug_sonic: XPath: '%s', nb_candidate_edit NULL", xpath);
 			continue;
 		}
 	}

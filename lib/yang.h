@@ -801,6 +801,16 @@ extern LY_ERR yang_lyd_new_list(struct lyd_node_inner *parent,
 				struct lyd_node **nodes);
 extern LY_ERR yang_lyd_trim_xpath(struct lyd_node **rootp, const char *xpath);
 
+#define lyd_free_tree debug_lyd_free_tree 
+
+extern void debug_lyd_free_tree(struct lyd_node *dnode);
+
+#define lyd_new_path debug_lyd_new_path
+
+extern LY_ERR debug_lyd_new_path(struct lyd_node *parent, const struct ly_ctx
+        *ctx, const char *path, const char *value,
+        uint32_t options, struct lyd_node **node);
+
 #ifdef __cplusplus
 }
 #endif
