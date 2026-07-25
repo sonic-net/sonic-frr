@@ -2,7 +2,9 @@
 
 # standard Debian options & profiles
 
+# Upgrade FORTIFY_SOURCE to level 3 (dpkg default is =2).
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_CPPFLAGS_MAINT_APPEND = -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3
 
 ifneq (,$(filter terse,$(DEB_BUILD_OPTIONS)))
   MAKE_SILENT="V=0"
