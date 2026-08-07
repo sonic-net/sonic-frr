@@ -1218,7 +1218,7 @@ int lsp_generate(struct isis_area *area, int level)
 	lsp_build(newlsp, area);
 	/* time to calculate our checksum */
 	lsp_seqno_update(newlsp);
-	newlsp->last_generated = time(NULL);
+	newlsp->last_generated = (int64_t)time(NULL);
 	lsp_flood(newlsp, NULL);
 	area->lsp_gen_count[level - 1]++;
 
@@ -1285,7 +1285,7 @@ static int lsp_regenerate(struct isis_area *area, int level)
 	lsp_build(lsp, area);
 	rem_lifetime = lsp_rem_lifetime(area, level);
 	lsp->hdr.rem_lifetime = rem_lifetime;
-	lsp->last_generated = time(NULL);
+	lsp->last_generated = (int64_t)time(NULL);
 	lsp_flood(lsp, NULL);
 	area->lsp_gen_count[level - 1]++;
 	for (ALL_LIST_ELEMENTS_RO(lsp->lspu.frags, node, frag)) {
@@ -1372,7 +1372,7 @@ int _lsp_regenerate_schedule(struct isis_area *area, int level,
 {
 	struct isis_lsp *lsp;
 	uint8_t id[ISIS_SYS_ID_LEN + 2];
-	time_t now, diff;
+	int64_t now, diff;
 	long timeout;
 	struct listnode *cnode;
 	struct isis_circuit *circuit;
@@ -1390,7 +1390,7 @@ int _lsp_regenerate_schedule(struct isis_area *area, int level,
 
 	memcpy(id, isis->sysid, ISIS_SYS_ID_LEN);
 	LSP_PSEUDO_ID(id) = LSP_FRAGMENT(id) = 0;
-	now = time(NULL);
+	now = (int64_t)time(NULL);
 
 	for (lvl = IS_LEVEL_1; lvl <= IS_LEVEL_2; lvl++) {
 		if (!((level & lvl) && (area->is_type & lvl)))
@@ -1657,7 +1657,7 @@ static int lsp_regenerate_pseudo(struct isis_circuit *circuit, int level)
 	lsp->hdr.rem_lifetime = rem_lifetime;
 	lsp_build_pseudo(lsp, circuit, level);
 	lsp_inc_seqno(lsp, 0);
-	lsp->last_generated = time(NULL);
+	lsp->last_generated = (int64_t)time(NULL);
 	lsp_flood(lsp, NULL);
 
 	refresh_time = lsp_refresh_time(lsp, rem_lifetime);
@@ -1735,7 +1735,7 @@ int lsp_regenerate_schedule_pseudo(struct isis_circuit *circuit, int level)
 {
 	struct isis_lsp *lsp;
 	uint8_t lsp_id[ISIS_SYS_ID_LEN + 2];
-	time_t now, diff;
+	int64_t now, diff;
 	long timeout;
 	int lvl;
 	struct isis_area *area = circuit->area;
@@ -1752,7 +1752,7 @@ int lsp_regenerate_schedule_pseudo(struct isis_circuit *circuit, int level)
 	memcpy(lsp_id, isis->sysid, ISIS_SYS_ID_LEN);
 	LSP_PSEUDO_ID(lsp_id) = circuit->circuit_id;
 	LSP_FRAGMENT(lsp_id) = 0;
-	now = time(NULL);
+	now = (int64_t)time(NULL);
 
 	for (lvl = IS_LEVEL_1; lvl <= IS_LEVEL_2; lvl++) {
 		sched_debug(

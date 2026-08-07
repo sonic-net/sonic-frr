@@ -158,6 +158,8 @@ extern void zlog_hexdump(const void *mem, unsigned int len);
 extern const char *zlog_sanitize(char *buf, size_t bufsz, const void *in,
 				 size_t inlen);
 
+extern uint32_t frr_time_t_to_uint32_t(time_t value);
+
 
 extern int vzlog_test(int priority);
 

@@ -46,7 +46,7 @@ struct isis_lsp {
 	int level;     /* L1 or L2? */
 	int scheduled; /* scheduled for sending */
 	time_t installed;
-	time_t last_generated;
+	int64_t last_generated;
 	int own_lsp;
 	/* used for 60 second counting when rem_lifetime is zero */
 	int age_out;

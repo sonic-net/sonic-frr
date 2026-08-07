@@ -847,7 +847,8 @@ static int process_lsp(uint8_t pdu_type, struct isis_circuit *circuit,
 #ifndef FABRICD
 	/* send northbound notification */
 	isis_notif_lsp_received(circuit, rawlspid_print(hdr.lsp_id), hdr.seqno,
-				time(NULL), sysid_print(hdr.lsp_id));
+				frr_time_t_to_uint32_t(time(NULL)),
+				sysid_print(hdr.lsp_id));
 #endif /* ifndef FABRICD */
 
 	if (pdu_len_validate(hdr.pdu_len, circuit)) {
