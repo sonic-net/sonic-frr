@@ -547,11 +547,22 @@ static void rtadv_process_optional(uint8_t *optional, unsigned int len,
 {
 	char *mac;
 
-	while (len > 0) {
+	while (len >= sizeof(struct nd_opt_hdr)) {
 		struct nd_opt_hdr *opt_hdr = (struct nd_opt_hdr *)optional;
+		unsigned int opt_len = 8 * opt_hdr->nd_opt_len;
+
+		/* An option must make progress and fit within the remaining data. */
+		if (opt_len == 0 || opt_len > len) {
+			if (IS_ZEBRA_DEBUG_PACKET)
+				zlog_debug("%s: Received RA with invalid option length %u (remaining %u), discarding",
+					   __func__, opt_hdr->nd_opt_len, len);
+			return;
+		}
 
 		switch(opt_hdr->nd_opt_type) {
 		case ND_OPT_SOURCE_LINKADDR:
+			if (opt_len < 2 + 6)
+				break;
 			mac = (char *)(optional+2);
 			if_nbr_mac_to_ipv4ll_neigh_update(ifp, mac,
 							  &addr->sin6_addr, 1);
@@ -560,8 +571,8 @@ static void rtadv_process_optional(uint8_t *optional, unsigned int len,
 			break;
 		}
 
-		len -= 8 * opt_hdr->nd_opt_len;
-		optional += 8 * opt_hdr->nd_opt_len;
+		len -= opt_len;
+		optional += opt_len;
 	}
 }
 
