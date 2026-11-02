@@ -720,6 +720,9 @@ void if_delete_update(struct interface **pifp)
 	if (!CHECK_FLAG(ifp->status, ZEBRA_INTERFACE_ACTIVE))
 		return;
 
+	/* Stop RA while its wheel key and VRF are still valid. */
+	rtadv_stop_ra(ifp, true);
+
 	/* Mark interface as inactive */
 	UNSET_FLAG(ifp->status, ZEBRA_INTERFACE_ACTIVE);
 
