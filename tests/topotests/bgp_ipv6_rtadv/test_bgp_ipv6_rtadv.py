@@ -16,6 +16,7 @@
 import os
 import sys
 import json
+import time
 from functools import partial
 import pytest
 
@@ -158,6 +159,70 @@ def test_route_convergence():
         _, result = topotest.run_and_expect(test_func, None, count=160, wait=0.5)
         assertmsg = '"{}" JSON output mismatches'.format(router.name)
         assert result is None, assertmsg
+
+
+@pytest.mark.parametrize("recreate", [False, True])
+def test_ra_interface_delete(recreate):
+    """Remove RA references on deletion and preserve RA on interface recreation."""
+    tgen = get_topogen()
+    if tgen.routers_have_failure():
+        pytest.skip(tgen.errors)
+
+    router = tgen.gears["r1"]
+    interface = "ra-delete-test"
+    kernel_interface = False
+    configured = False
+
+    def ra_registered():
+        output = router.cmd_raises("vtysh -c 'show ipv6 nd ra-interfaces'")
+        return interface in output.split()
+
+    try:
+        router.cmd_raises("ip link add {} type dummy".format(interface))
+        kernel_interface = True
+        old_index = json.loads(
+            router.cmd_raises("ip -j link show {}".format(interface))
+        )[0]["ifindex"]
+        router.cmd_raises(
+            "vtysh -c 'configure terminal' -c 'interface {}' "
+            "-c 'no ipv6 nd suppress-ra'".format(interface)
+        )
+        configured = True
+        _, result = topotest.run_and_expect(ra_registered, True, count=40, wait=0.1)
+        assert result is True, "RA was not registered on the initially down interface"
+
+        router.cmd_raises("ip link del {}".format(interface))
+        kernel_interface = False
+        _, result = topotest.run_and_expect(ra_registered, False, count=40, wait=0.1)
+        assert result is False, "Deleted interface remains in the RA advertiser list"
+
+        if recreate:
+            router.cmd_raises("ip link add {} type dummy".format(interface))
+            kernel_interface = True
+            new_index = json.loads(
+                router.cmd_raises("ip -j link show {}".format(interface))
+            )[0]["ifindex"]
+            assert (
+                new_index != old_index
+            ), "Recreation did not produce a new interface index"
+            router.cmd_raises("ip link set {} up".format(interface))
+            _, result = topotest.run_and_expect(ra_registered, True, count=40, wait=0.1)
+            assert (
+                result is True
+            ), "Configured RA was not restored on the recreated interface"
+    finally:
+        if kernel_interface:
+            router.cmd_raises("ip link del {}".format(interface))
+        if configured:
+            router.cmd_raises(
+                "vtysh -c 'configure terminal' -c 'no interface {}'".format(interface)
+            )
+
+    # Allow a wheel revolution after freeing the configured interface object.
+    time.sleep(1.2)
+    assert (
+        router.check_router_running() == ""
+    ), "A daemon failed after RA interface deletion"
 
 
 def test_memory_leak():
